@@ -52,7 +52,7 @@ function toB64(str){const by=new TextEncoder().encode(str);let s='';for(let i=0;
 /* ========== IndexedDB (large + fast, one record per row) ========== */
 const SYNCED=['products','parties','docs','money','users','meta'];
 /* ===== একাধিক প্রোফাইল: প্রতিটির আলাদা ডেটাবেস, লগইন-কী ও GitHub ফোল্ডার ===== */
-const PROF=(()=>{let l=[];try{l=JSON.parse(localStorage.getItem('bdcpro_profiles')||'[]')}catch(e){}if(!Array.isArray(l)||!l.length)l=[{id:'main',name:''}];let c=localStorage.getItem('bdcpro_cur');if(!l.some(p=>p.id===c))c=l[0].id;return{list:l,cur:c}})();
+const PROF=(()=>{let l=[];try{l=JSON.parse(localStorage.getItem('bdcpro_profiles')||'[]')}catch(e){}if(!Array.isArray(l)||!l.length)l=[{id:'main',name:''}];let c=localStorage.getItem('bdcpro_cur');try{if(!sessionStorage.getItem('bdcpro_sw'))c=l[0].id}catch(e){}if(!l.some(p=>p.id===c))c=l[0].id;return{list:l,cur:c}})();
 const profSave=()=>{try{localStorage.setItem('bdcpro_profiles',JSON.stringify(PROF.list))}catch(e){}};
 const DBNAME=PROF.cur==='main'?'bdcpro2':'bdcpro2_'+PROF.cur;
 const UIDK=PROF.cur==='main'?'bdcpro_uid':'bdcpro_uid_'+PROF.cur;
