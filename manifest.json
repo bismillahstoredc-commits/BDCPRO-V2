@@ -1,0 +1,84 @@
+{
+ "id": "./",
+ "name": "BDC PRO — Bismillah Distribution Center",
+ "short_name": "BDC PRO",
+ "description": "ব্যবসার হিসাব ও ইনভেন্টরি — অফলাইন ও অনলাইন",
+ "lang": "bn",
+ "dir": "ltr",
+ "start_url": "./index.html",
+ "scope": "./",
+ "display": "standalone",
+ "display_override": [
+  "standalone",
+  "minimal-ui"
+ ],
+ "orientation": "any",
+ "background_color": "#ffffff",
+ "theme_color": "#6c2bd9",
+ "categories": [
+  "business",
+  "finance",
+  "productivity"
+ ],
+ "icons": [
+  {
+   "src": "icon-192.png",
+   "sizes": "192x192",
+   "type": "image/png",
+   "purpose": "any"
+  },
+  {
+   "src": "icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "any"
+  },
+  {
+   "src": "maskable-192.png",
+   "sizes": "192x192",
+   "type": "image/png",
+   "purpose": "maskable"
+  },
+  {
+   "src": "maskable-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "maskable"
+  }
+ ],
+ "shortcuts": [
+  {
+   "name": "নতুন বিক্রয়",
+   "short_name": "বিক্রয়",
+   "url": "./index.html?go=pos:sale",
+   "icons": [
+    {
+     "src": "icon-192.png",
+     "sizes": "192x192"
+    }
+   ]
+  },
+  {
+   "name": "নতুন ক্রয়",
+   "short_name": "ক্রয়",
+   "url": "./index.html?go=pos:purchase",
+   "icons": [
+    {
+     "src": "icon-192.png",
+     "sizes": "192x192"
+    }
+   ]
+  },
+  {
+   "name": "পণ্যসমূহ",
+   "short_name": "পণ্য",
+   "url": "./index.html?go=products",
+   "icons": [
+    {
+     "src": "icon-192.png",
+     "sizes": "192x192"
+    }
+   ]
+  }
+ ]
+}
