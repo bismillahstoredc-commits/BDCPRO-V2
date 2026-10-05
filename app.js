@@ -3,7 +3,7 @@
 const profName=p=>p.id===PROF.cur?(biz().name||p.name||'নতুন প্রোফাইল'):(p.name||'নতুন প্রোফাইল');
 function profSel(){return PROF.list.length>1?`<div class="f"><label>🏢 প্রোফাইল (ব্যবসা)</label><select id="pfs">${PROF.list.map(p=>`<option value="${p.id}" ${p.id===PROF.cur?'selected':''}>${esc(profName(p))}</option>`).join('')}</select></div>`:''}
 function syncProfName(){const p=PROF.list.find(x=>x.id===PROF.cur),n=biz().name||'';if(p&&n&&p.name!==n)p.name=n;profSave()}
-function switchProfile(id){try{sessionStorage.setItem('bdcpro_sw','1')}catch(e){}localStorage.setItem('bdcpro_cur',id);location.reload()}
+function switchProfile(id){localStorage.setItem('bdcpro_cur',id);location.reload()}
 function createProfile(name){const id='p'+Date.now().toString(36);PROF.list.push({id,name});profSave();switchProfile(id)}
 function profilesModal(){
   const own=isOwner();
@@ -25,7 +25,7 @@ async function deleteProfile(){
   try{backupNow('profile-delete')}catch(e){}
   try{IDB.db.close()}catch(e){}
   await new Promise(r=>{const q=indexedDB.deleteDatabase(DBNAME);q.onsuccess=q.onerror=q.onblocked=()=>r()});
-  PROF.list=PROF.list.filter(p=>p.id!==PROF.cur);profSave();try{const _m=JSON.parse(localStorage.getItem('bdcpro_dirs')||'{}');delete _m[PROF.cur];localStorage.setItem('bdcpro_dirs',JSON.stringify(_m))}catch(_e){}localStorage.removeItem(UIDK);try{sessionStorage.setItem('bdcpro_sw','1')}catch(e){}localStorage.setItem('bdcpro_cur',PROF.list[0].id);location.reload();
+  PROF.list=PROF.list.filter(p=>p.id!==PROF.cur);profSave();localStorage.removeItem(UIDK);localStorage.setItem('bdcpro_cur',PROF.list[0].id);location.reload();
 }
 function showAuth(html){$('#app').style.display='none';const a=$('#auth');a.style.display='flex';a.innerHTML=`<div class="ac"><div class="brand"><img class="l" src="${LOGO_URI}" alt=""><span class="wm"><img src="${WM_URI}" alt="BDC PRO"></span></div>${profSel()}${html}</div>`;const ps=$('#pfs');if(ps)ps.onchange=()=>switchProfile(ps.value)}
 async function mkUser(name,username,pass,role){
@@ -53,7 +53,7 @@ function authRestore(){
   <div class="f"><label>ব্রাঞ্চ</label><input id="gb" value="${esc(SYNC.branch||'main')}"></div><div class="f"><label>ডেটা ফোল্ডার (এই প্রোফাইলের)</label><input id="gd" value="${esc(ddir())}"></div><div class="f"><label>অ্যাক্সেস টোকেন</label><input id="gt" type="password" value="${esc(SYNC.token)}"></div>
   <button class="btn" style="width:100%" id="go">রিস্টোর করুন</button><p style="text-align:center"><a id="bk">← ফিরে যান</a></p>`);
   $('#bk').onclick=authSetup;
-  $('#go').onclick=async()=>{{const _d=$('#gd').value.trim()||DATADIR,_k=$('#go1').value.trim()+'/'+$('#gr').value.trim()+'/'+_d;let _m={};try{_m=JSON.parse(localStorage.getItem('bdcpro_dirs')||'{}')}catch(_e){}const _x=Object.keys(_m).find(k=>_m[k]===_k&&k!==PROF.cur);if(_x)return toast('এই ফোল্ডার অন্য প্রোফাইল ব্যবহার করছে — ডেটা মিশে যাবে। আলাদা ফোল্ডারের নাম দিন','e');_m[PROF.cur]=_k;try{localStorage.setItem('bdcpro_dirs',JSON.stringify(_m))}catch(_e){}}Object.assign(SYNC,{owner:$('#go1').value.trim(),repo:$('#gr').value.trim(),branch:$('#gb').value.trim()||'main',dir:$('#gd').value.trim()||DATADIR,token:$('#gt').value.trim(),sha:{}});
+  $('#go').onclick=async()=>{Object.assign(SYNC,{owner:$('#go1').value.trim(),repo:$('#gr').value.trim(),branch:$('#gb').value.trim()||'main',dir:$('#gd').value.trim()||DATADIR,token:$('#gt').value.trim(),sha:{}});
     $('#go').disabled=true;$('#go').textContent='ডাউনলোড হচ্ছে...';await doSync(true);
     if(!live('users').length){$('#go').disabled=false;$('#go').textContent='রিস্টোর করুন';toast('এই repository-তে কোনো ডেটা পাওয়া যায়নি','e');return}
     boot()};
@@ -143,7 +143,7 @@ SCR.settings=()=>{
   $('#gsy').onclick=()=>{rd();saveKV();doSync(true)};
   $('#gall').onclick=()=>{rd();if(confirm('সব ডেটা GitHub-এ আপলোড হবে। চালিয়ে যাবেন?'))pushAll()};
   $('#ex').onclick=()=>{const o={v:2,at:new Date().toISOString()};SYNCED.forEach(s=>o[s]=[...S[s].values()]);const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(o)],{type:'application/json'}));a.download='BSPRO-backup-'+today()+'.json';a.click()};
-  $('#im').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const o=JSON.parse(await f.text());if(o.prof&&o.prof!==PROF.cur&&!confirm('⚠ সতর্কতা: এই ব্যাকআপ অন্য প্রোফাইলের ('+(o.profName||o.prof)+')। এখনকার প্রোফাইলে বসালে দুটোর তথ্য মিশে যাবে। তবুও চালিয়ে যাবেন?')){e.target.value='';return}if(!confirm('ব্যাকআপ ফাইলের সব তথ্য এখনকার তথ্যের ওপর বসানো হবে। চালিয়ে যাবেন?')){e.target.value='';return}let n=0;
+  $('#im').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const o=JSON.parse(await f.text());if(!confirm('ব্যাকআপ ফাইলের সব তথ্য এখনকার তথ্যের ওপর বসানো হবে। চালিয়ে যাবেন?')){e.target.value='';return}let n=0;
     for(const s of SYNCED){const rows=(o[s]||[]).filter(r=>r&&r.id);if(rows.length){await saveMany(s,rows.map(r=>({...r})));n+=rows.length}}
     IDXC=null;saveKV();toast(n+'টি তথ্য ফিরিয়ে আনা হয়েছে','k');SCR.settings()}catch(x){toast('ফাইলটি সঠিক নয়','e')}};
   if(navigator.storage&&navigator.storage.estimate)navigator.storage.estimate().then(s=>{$('#stg').textContent=`ব্যবহৃত স্টোরেজ: ${(s.usage/1048576).toFixed(1)} MB (ব্রাউজার বরাদ্দ: ~${Math.round(s.quota/1048576)} MB)`}).catch(()=>{});
@@ -154,7 +154,7 @@ if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWor
 boot();
 
 /* ========== ইউটিলিটি: অ্যাকাউন্ট রিসেট (শুধু মালিক) ========== */
-function backupNow(tag){const o={v:2,at:new Date().toISOString(),prof:PROF.cur,profName:(biz().name||'')};SYNCED.forEach(s=>o[s]=[...S[s].values()]);const el=document.createElement('a');el.href=URL.createObjectURL(new Blob([JSON.stringify(o)],{type:'application/json'}));el.download='BDCPRO-'+((biz().name||PROF.cur).replace(/[^\w\u0980-\u09FF-]+/g,'_'))+'-backup-'+(tag||'')+today()+'.json';el.click()}
+function backupNow(tag){const o={v:2,at:new Date().toISOString()};SYNCED.forEach(s=>o[s]=[...S[s].values()]);const el=document.createElement('a');el.href=URL.createObjectURL(new Blob([JSON.stringify(o)],{type:'application/json'}));el.download='BSPRO-backup-'+(tag||'')+today()+'.json';el.click()}
 SCR.reset=()=>{
   if(!isOwner())return go('dash');
   const n=(st,f)=>[...S[st].values()].filter(r=>!r.del&&(!f||f(r))).length;

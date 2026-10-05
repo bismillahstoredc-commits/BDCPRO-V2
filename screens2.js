@@ -117,16 +117,27 @@ SCR.expense=()=>{
 let CM=today().slice(0,7);
 const CB_L={cash_in:'নগদ জমা (ক্যাশে)',cash_out:'নগদ উত্তোলন (ক্যাশ থেকে)',bank_in:'ব্যাংকে জমা (বাইরে থেকে)',bank_out:'ব্যাংক থেকে উত্তোলন (বাইরে)',c2b:'ক্যাশ → ব্যাংকে জমা',b2c:'ব্যাংক → ক্যাশে উত্তোলন'};
 SCR.cash=()=>{
-  const X=idx();
+  const X=idx(),PA=profitAll();
   view(`<div class="grid g2"><div class="stat g"><small>ক্যাশ ব্যালেন্স</small><div>${money(X.cash)}</div></div><div class="stat"><small>ব্যাংক ব্যালেন্স</small><div>${money(X.bank)}</div></div></div>
   <div class="card" style="margin-top:12px"><h3>নতুন এন্ট্রি</h3><div class="grid g2"><div class="f"><label>ধরন</label><select id="k">${Object.entries(CB_L).map(([k,l])=>`<option value="${k}">${l}</option>`).join('')}</select></div><div class="f"><label>পরিমাণ</label><input id="a" type="number"></div></div>
   <div class="grid g2"><div class="f"><label>তারিখ</label><input id="d" type="date" value="${today()}"></div><div class="f"><label>নোট</label><input id="n"></div></div><button class="btn" id="s">সেভ করুন</button></div>
+  ${isOwner()?`<div class="card" style="margin-top:12px;border:2px solid var(--p)"><h3>💸 লভ্যাংশ উত্তোলন (শুধু লাভের টাকা)</h3>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px"><div class="stat" style="padding:8px"><small>মোট নীট লাভ</small><div style="font-size:16px">${money(PA.net)}</div></div><div class="stat r" style="padding:8px"><small>মোট উত্তোলন</small><div style="font-size:16px">${money(PA.draw)}</div></div><div class="stat g" style="padding:8px"><small>উত্তোলনযোগ্য লাভ</small><div style="font-size:16px;color:${PA.avail<0?'var(--r)':'var(--g)'}">${money(Math.max(PA.avail,0))}</div></div></div>
+  <div class="grid g2"><div class="f"><label>পরিমাণ</label><input id="wa" type="number" step="any"></div><div class="f"><label>কোথা থেকে</label><select id="wm"><option value="cash">ক্যাশ (${money(X.cash)})</option><option value="bank">ব্যাংক (${money(X.bank)})</option></select></div></div>
+  <div class="grid g2"><div class="f"><label>তারিখ</label><input id="wd" type="date" value="${today()}"></div><div class="f"><label>নোট</label><input id="wn"></div></div>
+  <button class="btn" id="ws">লভ্যাংশ তুলুন</button><small style="display:block;color:var(--m);margin-top:6px">শুধু জমা হওয়া লাভের টাকাই তোলা যাবে — লাভের বেশি বা ক্যাশ/ব্যাংকে যা আছে তার বেশি তোলা যাবে না। মূলধনে হাত পড়বে না।</small></div>`:''}
   <div class="card"><div class="row sp"><h3 style="margin:0">এন্ট্রির তালিকা</h3><input type="month" id="mo" value="${CM}" style="width:auto"></div><div id="cl"></div></div>`);
   $('#s').onclick=async()=>{const a=num($('#a').value);if(a<=0)return toast('সঠিক পরিমাণ দিন','e');
     await save('money',{id:uid(),kind:$('#k').value,amount:a,date:$('#d').value||today(),note:$('#n').value,createdAt:Date.now()});toast('সেভ হয়েছে','k');SCR.cash()};
+  if($('#ws'))$('#ws').onclick=async()=>{const a=num($('#wa').value),m=$('#wm').value,P=profitAll(),XX=idx();
+    if(a<=0)return toast('সঠিক পরিমাণ দিন','e');
+    if(a>P.avail+0.001)return toast('শুধু লাভের টাকা তোলা যাবে — উত্তোলনযোগ্য লাভ '+money(Math.max(P.avail,0)),'e');
+    if(a>(m==='bank'?XX.bank:XX.cash)+0.001)return toast((m==='bank'?'ব্যাংকে':'ক্যাশে')+' এত টাকা নেই (আছে '+money(m==='bank'?XX.bank:XX.cash)+')','e');
+    if(!confirm(money(a)+' লভ্যাংশ উত্তোলন করবেন? উত্তোলনের পর অবশিষ্ট লাভ '+money(P.avail-a)))return;
+    await save('money',{id:uid(),kind:'drawing',method:m,amount:a,date:$('#wd').value||today(),note:$('#wn').value,createdAt:Date.now()});toast('লভ্যাংশ উত্তোলন সেভ হয়েছে','k');SCR.cash()};
   $('#mo').onchange=e=>{CM=e.target.value;paint()};
-  function paint(){const rows=live('money').filter(m=>CB_L[m.kind]&&m.date.startsWith(CM)).sort(byDateDesc);
-    $('#cl').innerHTML=tblc(['তারিখ','ধরন','নোট','>পরিমাণ',''],rows.map(m=>[m.date,CB_L[m.kind],esc(m.note||'-'),money(m.amount),isOwner()?`<button class="btn d s" data-x="${m.id}">✕</button>`:'']));
+  function paint(){const rows=live('money').filter(m=>(CB_L[m.kind]||m.kind==='drawing')&&m.date.startsWith(CM)).sort(byDateDesc);
+    $('#cl').innerHTML=tblc(['তারিখ','ধরন','নোট','>পরিমাণ',''],rows.map(m=>[m.date,CB_L[m.kind]||('💸 লভ্যাংশ উত্তোলন ('+(m.method==='bank'?'ব্যাংক':'ক্যাশ')+')'),esc(m.note||'-'),money(m.amount),isOwner()?`<button class="btn d s" data-x="${m.id}">✕</button>`:'']));
     $$('[data-x]').forEach(b=>b.onclick=async()=>{if(confirm('ডিলিট করবেন?')){await remove('money',S.money.get(b.dataset.x));SCR.cash()}})}
   paint();
 };
@@ -165,14 +176,14 @@ function paintR(){
     h=`<h3>ক্যাটাগরি অনুযায়ী</h3>`+tblc(['ক্যাটাগরি','>টাকা'],Object.entries(by).map(([k,v])=>[esc(k),money(v)]),['মোট',money(t)])+`<h3>বিস্তারিত</h3>`+tblc(['তারিখ','ক্যাটাগরি','নোট','>টাকা'],rows.map(m=>[m.date,esc(m.cat),esc(m.note||'-'),money(m.amount)]))}
   else if(T==='daybook'&&isOwner()){
     const ev=[];docs.forEach(d=>{const e=cashEffect(0,d);if(e[0]||e[1])ev.push({date:d.date,txt:TYPES[d.type].l+' '+d.no,c:e[0],b:e[1]})});
-    live('money').filter(inR).forEach(m=>{const e=cashEffect(0,m);if(e[0]||e[1])ev.push({date:m.date,txt:(CB_L[m.kind]||({payment_in:'আদায়',payment_out:'পরিশোধ',expense:'খরচ: '+(m.cat||'')})[m.kind])+(m.partyId?' — '+partyName(m.partyId):''),c:e[0],b:e[1]})});
+    live('money').filter(inR).forEach(m=>{const e=cashEffect(0,m);if(e[0]||e[1])ev.push({date:m.date,txt:(CB_L[m.kind]||({payment_in:'আদায়',payment_out:'পরিশোধ',drawing:'💸 লভ্যাংশ উত্তোলন',expense:'খরচ: '+(m.cat||'')})[m.kind])+(m.partyId?' — '+partyName(m.partyId):''),c:e[0],b:e[1]})});
     ev.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);let ci=0,co=0,bi=0,bo=0;ev.forEach(e=>{if(e.c>0)ci+=e.c;else co-=e.c;if(e.b>0)bi+=e.b;else bo-=e.b});
     h=tblc(['তারিখ','বিবরণ','>ক্যাশ জমা','>ক্যাশ খরচ','>ব্যাংক জমা','>ব্যাংক খরচ'],ev.map(e=>[e.date,esc(e.txt),e.c>0?money(e.c):'',e.c<0?money(-e.c):'',e.b>0?money(e.b):'',e.b<0?money(-e.b):'']),['মোট','',money(ci),money(co),money(bi),money(bo)])}
   else if(T==='pl'&&isOwner()){let rev=0,cogs=0,free=0;docs.forEach(d=>{if(d.type==='sale'||d.type==='sale_return'){const k=d.type==='sale'?1:-1;rev+=k*num(d.total);d.items.forEach(i=>cogs+=k*num(i.qty)*num(i.cost))}if(d.type==='free')d.items.forEach(i=>free+=num(i.qty)*num(i.cost))});
-    let ex=0;live('money').filter(m=>m.kind==='expense'&&inR(m)).forEach(m=>ex+=num(m.amount));const gp=rev-cogs,net=gp-ex-free;
-    h=`<table><tr><td>নীট বিক্রয়</td><td class="n">${money(rev)}</td></tr><tr><td>বিক্রীত পণ্যের ক্রয়মূল্য</td><td class="n">- ${money(cogs)}</td></tr><tr class="tot"><td>মোট লাভ (গ্রস)</td><td class="n">${money(gp)}</td></tr><tr><td>মোট খরচ</td><td class="n">- ${money(ex)}</td></tr><tr><td>ফ্রি আইটেমের ক্রয়মূল্য</td><td class="n">- ${money(free)}</td></tr><tr class="tot"><td>নীট লাভ / (ক্ষতি)</td><td class="n" style="color:${net<0?'var(--r)':'var(--g)'}">${money(net)}</td></tr></table>`}
+    let ex=0;live('money').filter(m=>m.kind==='expense'&&inR(m)).forEach(m=>ex+=num(m.amount));const gp=rev-cogs,net=gp-ex-free;let dw=0;live('money').filter(m=>m.kind==='drawing'&&inR(m)).forEach(m=>dw+=num(m.amount));const PA=profitAll();
+    h=`<table><tr><td>নীট বিক্রয়</td><td class="n">${money(rev)}</td></tr><tr><td>বিক্রীত পণ্যের ক্রয়মূল্য</td><td class="n">- ${money(cogs)}</td></tr><tr class="tot"><td>মোট লাভ (গ্রস)</td><td class="n">${money(gp)}</td></tr><tr><td>মোট খরচ</td><td class="n">- ${money(ex)}</td></tr><tr><td>ফ্রি আইটেমের ক্রয়মূল্য</td><td class="n">- ${money(free)}</td></tr><tr class="tot"><td>নীট লাভ / (ক্ষতি)</td><td class="n" style="color:${net<0?'var(--r)':'var(--g)'}">${money(net)}</td></tr><tr><td>লভ্যাংশ উত্তোলন (এই সময়ে)</td><td class="n">- ${money(dw)}</td></tr><tr class="tot"><td>অবশিষ্ট লাভ (এই সময়ে)</td><td class="n">${money(net-dw)}</td></tr></table><small style="display:block;margin-top:8px;color:var(--m)">সব সময়ের হিসাবে: মোট নীট লাভ ${money(PA.net)} − মোট উত্তোলন ${money(PA.draw)} = উত্তোলনযোগ্য লাভ <b>${money(Math.max(PA.avail,0))}</b></small>`}
   else if(T==='bs'&&isOwner()){const X=idx();let recv=0,pay=0,sv=0;S.parties.forEach(p=>{if(p.del)return;const d=dueOf(p);if(p.type==='supplier')pay+=d;else recv+=d});S.products.forEach(p=>{if(!p.del)sv+=Math.max(stockOf(p.id),0)*num(p.buyPrice)});
     const ta=X.cash+X.bank+sv+recv;h=`<div class="grid g2"><div><h3>সম্পদ</h3><table><tr><td>ক্যাশ</td><td class="n">${money(X.cash)}</td></tr><tr><td>ব্যাংক</td><td class="n">${money(X.bank)}</td></tr><tr><td>স্টক মূল্য</td><td class="n">${money(sv)}</td></tr><tr><td>কাস্টমারের কাছে পাওনা</td><td class="n">${money(recv)}</td></tr><tr class="tot"><td>মোট সম্পদ</td><td class="n">${money(ta)}</td></tr></table></div>
-    <div><h3>দায় ও মূলধন</h3><table><tr><td>সাপ্লায়ারকে দেনা</td><td class="n">${money(pay)}</td></tr><tr><td>মালিকের মূলধন (নীট)</td><td class="n">${money(ta-pay)}</td></tr><tr class="tot"><td>মোট</td><td class="n">${money(ta)}</td></tr></table></div></div><small>ব্যালেন্স শীট সর্বদা বর্তমান অবস্থার হিসাব (তারিখ ফিল্টার প্রযোজ্য নয়)।</small>`}
+    <div><h3>দায় ও মূলধন</h3><table><tr><td>সাপ্লায়ারকে দেনা</td><td class="n">${money(pay)}</td></tr><tr><td>মালিকের মূলধন (নীট)</td><td class="n">${money(ta-pay)}</td></tr><tr><td style="color:var(--m)">— এর মধ্যে অবশিষ্ট লাভ</td><td class="n" style="color:var(--m)">${money(profitAll().avail)}</td></tr><tr><td style="color:var(--m)">— মোট লভ্যাংশ উত্তোলন (আগেই বাদ)</td><td class="n" style="color:var(--m)">${money(profitAll().draw)}</td></tr><tr class="tot"><td>মোট</td><td class="n">${money(ta)}</td></tr></table></div></div><small>ব্যালেন্স শীট সর্বদা বর্তমান অবস্থার হিসাব (তারিখ ফিল্টার প্রযোজ্য নয়)।</small>`}
   el.innerHTML=h||'<div class="empty">নেই</div>';
 }
