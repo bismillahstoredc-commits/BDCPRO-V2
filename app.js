@@ -80,18 +80,126 @@ async function installApp(){
   modal('অ্যাপ ইনস্টল করুন',`<p>${isIOS()?'iPhone/iPad-এ <b>Safari</b> ব্রাউজারে: নিচের <b>শেয়ার (⬆)</b> বাটন → <b>Add to Home Screen</b> চাপুন।':'ব্রাউজারের মেনু (⋮) থেকে <b>Install app</b> / <b>Add to Home screen</b> বেছে নিন।'}</p><button class="btn" onclick="closeModal()">ঠিক আছে</button>`);
 }
 
+/* ========== অসম্পূর্ণ বিক্রয়/ক্রয়ের ড্রাফট: রিফ্রেশ হলেও হারাবে না ========== */
+const PSFX=PROF.cur==='main'?'':'_'+PROF.cur;
+const POSDRAFT_KEY='bdcpro_posdraft'+PSFX;let POSDRAFT_READY=false,POSDRAFT_LAST='';
+function posDraftLoad(){
+  try{const d=JSON.parse(localStorage.getItem(POSDRAFT_KEY)||'null');
+    if(!d||!d.pos||!ME||d.uid!==ME.id||Date.now()-d.t>365*24*3600*1000||!TYPES[d.pos.type])return null;
+    if(!Array.isArray(d.pos.items)||!d.pos.items.length)return null;
+    return d}catch(e){return null}
+}
+function posDraftSave(){
+  if(!POSDRAFT_READY||!ME)return;
+  try{
+    if(POS&&Array.isArray(POS.items)&&POS.items.length){
+      const s=JSON.stringify({uid:ME.id,t:Date.now(),pos:POS});
+      const k=JSON.stringify(POS);
+      if(k!==POSDRAFT_LAST){POSDRAFT_LAST=k;localStorage.setItem(POSDRAFT_KEY,s)}
+    }else{POSDRAFT_LAST='';localStorage.removeItem(POSDRAFT_KEY)}
+  }catch(e){}
+}
+setInterval(posDraftSave,500);
+addEventListener('pagehide',posDraftSave);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')posDraftSave()});
+/* ========== শেষ পেজ ও ফিল্টার মনে রাখা: অ্যাপ কেটে/রিফ্রেশ হলে সরাসরি সেই পেজে ফেরা ========== */
+const UI_KEY='bdcpro_ui'+PSFX;let UI_LAST='';
+const UI_SKIP=['logout','install','reset'];
+/* খোলা ফর্ম (পণ্য / পার্টি / টাকা আদায়) মনে রাখার জন্য */
+let MFORM=null;
+{const _pf=productForm,_pt=partyForm,_py=payForm,_m=modal,_cm=closeModal;
+ modal=function(){MFORM=null;return _m.apply(this,arguments)};
+ closeModal=function(){MFORM=null;return _cm.apply(this,arguments)};
+ productForm=function(p,cb,pre){const r=_pf.apply(this,arguments);MFORM={fn:'productForm',id:p&&p.id||null,pre:pre||null};return r};
+ partyForm=function(p,t,cb){const r=_pt.apply(this,arguments);MFORM={fn:'partyForm',id:p&&p.id||null,t:t||null};return r};
+ payForm=function(p,doc){const r=_py.apply(this,arguments);MFORM={fn:'payForm',id:p&&p.id||null,doc:doc&&doc.id||null};return r};
+}
+const fieldVals=root=>{const o={};if(!root)return o;root.querySelectorAll('input[id],select[id],textarea[id]').forEach(e=>{if(/^(password|file|button|submit)$/.test(e.type)||/tok|pass|pw|pin|secret/i.test(e.id))return;o[e.id]=(e.type==='checkbox'||e.type==='radio')?!!e.checked:e.value});return o};
+function fillVals(root,vals,fire){
+  if(!root||!vals)return;
+  Object.keys(vals).forEach(id=>{const e=root.querySelector('#'+CSS.escape(id));if(!e)return;const v=vals[id];
+    if(e.type==='checkbox'||e.type==='radio'){if(e.checked!==v){e.checked=v;fire&&e.dispatchEvent(new Event('change',{bubbles:true}))}return}
+    if(e.value===String(v))return;
+    if(e.tagName==='SELECT'&&![...e.options].some(o=>o.value===String(v)))return;
+    e.value=v;e.dispatchEvent(new Event(e.tagName==='SELECT'?'change':'input',{bubbles:true}))});
+}
+function formRestore(d){
+  try{
+    const f=d.mf;if(!f)return;
+    const refresh=()=>{if(CUR.r!=='pos')go(CUR.r,CUR.a)};
+    if(f.fn==='productForm'){const p=f.id?S.products.get(f.id):null;if(f.id&&!p)return;
+      productForm(p,CUR.r==='pos'?(np=>{if(np){addItem(np);paintGrid()}}):refresh,f.pre||undefined)}
+    else if(f.fn==='partyForm'){const p=f.id?S.parties.get(f.id):null;if(f.id&&!p)return;
+      partyForm(p,f.t,CUR.r==='pos'?(np=>{if(np){POS.partyId=np.id;paintPOS()}}):refresh)}
+    else if(f.fn==='payForm'){const p=S.parties.get(f.id);if(!p)return;payForm(p,f.doc?S.docs.get(f.doc):undefined)}
+    else return;
+    fillVals($('#mbody'),d.mv,true);
+  }catch(e){console.error(e)}
+}
+function uiSnap(){
+  let aa=CUR.a;try{if(aa&&(aa.pre||JSON.stringify(aa).length>2000))aa=CUR.r==='pos'?{type:aa.type}:null}catch(e){aa=null}
+  const m=$('#main');
+  return {uid:ME.id,t:Date.now(),r:CUR.r,a:aa||null,sc:m?m.scrollTop:0,
+    st:{INV,PQ,PT,DT,EM,CM,RP},
+    mf:(modalOpen()&&MFORM)?MFORM:null,mv:(modalOpen()&&MFORM)?fieldVals($('#mbody')):null,
+    fv:(CUR.r==='pos'||!m)?null:fieldVals(m)};
+}
+function uiLoad(){
+  try{const d=JSON.parse(localStorage.getItem(UI_KEY)||'null');
+    if(!d||!ME||d.uid!==ME.id||Date.now()-d.t>365*24*3600*1000||!d.r||UI_SKIP.includes(d.r)||!SCR[d.r])return null;
+    return d}catch(e){return null}
+}
+function uiApply(d){
+  try{const s=d.st||{};
+    if(s.INV)Object.assign(INV,s.INV);
+    if(typeof s.PQ==='string')PQ=s.PQ;
+    if(s.PT)PT=s.PT;if(s.DT)DT=s.DT;if(s.EM)EM=s.EM;if(s.CM)CM=s.CM;
+    if(s.RP)Object.assign(RP,s.RP);
+  }catch(e){}
+}
+function uiSave(){
+  if(!POSDRAFT_READY||!ME||UI_SKIP.includes(CUR.r))return;
+  try{const o=uiSnap(),k=JSON.stringify({...o,t:0,sc:0});
+    if(k!==UI_LAST||Math.abs((o.sc||0)-(+JSON.parse(localStorage.getItem(UI_KEY)||'{}').sc||0))>40){UI_LAST=k;localStorage.setItem(UI_KEY,JSON.stringify(o))}
+  }catch(e){}
+}
+setInterval(uiSave,700);
+addEventListener('pagehide',uiSave);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')uiSave()});
+function hideSplash(){const s=$('#splash');if(!s)return;s.classList.add('out');setTimeout(()=>s.remove(),400)}
+setTimeout(hideSplash,15000);
+try{const si=$('#splashimg');if(si&&typeof LOGO_URI!=='undefined')si.src=LOGO_URI}catch(e){}
 /* ========== boot ========== */
 async function boot(){
   if(!IDB.db){await IDB.open();await loadAll();if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{})}
   syncProfName();
-  if(!live('users').length)return authSetup();
+  if(!live('users').length){hideSplash();return authSetup()}
   const sid=localStorage.getItem(UIDK);ME=sid?S.users.get(sid):null;
-  if(!ME||ME.del||!ME.active){ME=null;return authLogin()}
+  if(!ME||ME.del||!ME.active){ME=null;hideSplash();return authLogin()}
   $('#auth').style.display='none';$('#app').style.display='flex';
   $('#tbz').textContent=biz().name||'';buildMenu();setStatus();
+  if(!window.__booted&&$('#splash')){ // প্রথমবার খোলার সময়: ডাটা সিঙ্ক (বা লোড) হওয়া পর্যন্ত স্প্ল্যাশ দেখানো, তারপর আগের জায়গায় খোলা
+    window.__booted=true;
+    const so=syncOn()&&navigator.onLine,t0=Date.now();
+    const tx=$('#splashtx');if(tx)tx.textContent=so?'ডাটা সিঙ্ক হচ্ছে…':'ডাটা লোড হচ্ছে…';
+    if(so){try{await Promise.race([doSync(),new Promise(r=>setTimeout(r,6000))])}catch(e){}}
+    const wait=900-(Date.now()-t0);if(wait>0)await new Promise(r=>setTimeout(r,wait));
+  }
   const g0=new URLSearchParams(location.search).get('go');
-  if(g0){history.replaceState(null,'',location.pathname);go(g0)}else go(CUR.r==='logout'?'dash':CUR.r,CUR.a);
-  refreshInstall();
+  const dr=posDraftLoad(),ui=uiLoad();
+  if(dr){POS=dr.pos;POS.q=''}
+  if(g0){history.replaceState(null,'',location.pathname);go(g0)}
+  else if(ui||dr){
+    const r=ui?ui.r:'pos';
+    if(ui)uiApply(ui);
+    if(r==='pos'){const ty=POS?POS.type:(ui.a&&ui.a.type)||'sale';go('pos:'+ty,{})}
+    else go(r,ui?ui.a:null);
+    if(ui)setTimeout(()=>{const m=$('#main');if(m){fillVals(m,ui.fv,true);m.scrollTop=ui.sc||0}},80);
+    if(ui&&ui.mf)formRestore(ui);
+    if(dr)toast('আগের অসম্পূর্ণ '+(TYPES[POS.type]?TYPES[POS.type].l:'এন্ট্রি')+' ফিরিয়ে আনা হয়েছে','k');
+  }
+  else go(CUR.r==='logout'?'dash':CUR.r,CUR.a);
+  POSDRAFT_READY=true;hideSplash();
   if(syncOn())doSync();
 }
 window.onSynced=()=>{

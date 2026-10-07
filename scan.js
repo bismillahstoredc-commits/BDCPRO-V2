@@ -2,6 +2,8 @@
 /* ========== বারকোড: জেনারেটর, বীপ, ক্যামেরা স্ক্যানার ========== */
 function ean13(b){let s=0;for(let i=0;i<12;i++)s+=(+b[i])*(i%2?3:1);return b+((10-s%10)%10)}
 function genBarcode(){let c;do{c=ean13('20'+String(Date.now()).slice(-8)+String(Math.floor(Math.random()*100)).padStart(2,'0'))}while(live('products').some(p=>p.barcode===c));return c}
+/* একই বারকোড আবার স্ক্যান হতে নূন্যতম সময় (মিলিসেকেন্ড) — ৩০০০ = ৩ সেকেন্ড */
+const SCAN_GAP=3000;
 let AC=null;
 function beep(ok){try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();const o=AC.createOscillator(),g=AC.createGain();o.frequency.value=ok?880:220;g.gain.value=.08;o.connect(g);g.connect(AC.destination);o.start();o.stop(AC.currentTime+(ok?.08:.25))}catch(e){}}
 let ZXP=null;
@@ -37,7 +39,7 @@ async function openScanner(onCode,multi){
     if(busy||closed)return;busy=true;
     try{const code=await detect();
       if(code){const now=Date.now();
-        if(code!==last||now-lt>1800){last=code;lt=now;const msg=await onCode(code);
+        if(code!==last||now-lt>SCAN_GAP){last=code;lt=now;const msg=await onCode(code);
           if(!multi){close();return}
           const m=$('#scm',ov);if(m&&msg)m.textContent=msg}}}catch(e){}
     busy=false;

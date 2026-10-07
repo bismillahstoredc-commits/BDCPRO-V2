@@ -90,9 +90,11 @@ tr.tot td{font-weight:700;border-top:2px solid var(--p)}td.n,th.n{text-align:rig
 .g4,.g3{grid-template-columns:1fr 1fr}.g2{grid-template-columns:1fr}.pos{flex-direction:column}.pos-r{position:static;min-width:0;width:100%}.pg{max-height:40vh}}
 @media(max-width:600px){.mo{padding:0}.mb2,.mb2.w{max-width:none;height:100%;max-height:100%;border-radius:0}}
 @media(min-width:900px){.top .mb{display:none}}
+#splash{position:fixed;inset:0;z-index:9999;background:linear-gradient(160deg,var(--p),var(--pd));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:#fff;transition:opacity .35s}#splash.out{opacity:0;pointer-events:none}#splash img{width:84px;height:84px;border-radius:20px;background:#fff;padding:6px;object-fit:contain}#splash .sp{width:34px;height:34px;border:4px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spn .8s linear infinite}@keyframes spn{to{transform:rotate(360deg)}}#splash b{font-size:16px}
 </style>
 </head>
 <body>
+<div id="splash"><img id="splashimg" alt=""><div class="sp"></div><b id="splashtx">ডাটা লোড হচ্ছে…</b></div>
 <div class="auth" id="auth"></div>
 <div id="app">
   <div class="ov" id="ov"></div>
