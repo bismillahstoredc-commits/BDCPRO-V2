@@ -50,7 +50,7 @@ async function sha256(t){
 function toB64(str){const by=new TextEncoder().encode(str);let s='';for(let i=0;i<by.length;i+=0x8000)s+=String.fromCharCode.apply(null,by.subarray(i,i+0x8000));return btoa(s)}
 
 /* ========== IndexedDB (large + fast, one record per row) ========== */
-const SYNCED=['products','parties','docs','money','users','meta'];
+const SYNCED=['products','parties','docs','money','users','meta','imgs'];
 /* ===== একাধিক প্রোফাইল: প্রতিটির আলাদা ডেটাবেস, লগইন-কী ও GitHub ফোল্ডার ===== */
 const PROF=(()=>{let l=[];try{l=JSON.parse(localStorage.getItem('bdcpro_profiles')||'[]')}catch(e){}if(!Array.isArray(l)||!l.length)l=[{id:'main',name:''}];let c=localStorage.getItem('bdcpro_cur');if(!l.some(p=>p.id===c))c=l[0].id;return{list:l,cur:c}})();
 const profSave=()=>{try{localStorage.setItem('bdcpro_profiles',JSON.stringify(PROF.list))}catch(e){}};
@@ -59,8 +59,8 @@ const UIDK=PROF.cur==='main'?'bdcpro_uid':'bdcpro_uid_'+PROF.cur;
 const DATADIR=PROF.cur==='main'?'data':'data-'+PROF.cur;
 const ddir=()=>(typeof SYNC!=='undefined'&&SYNC.dir)||DATADIR;
 const IDB={db:null,
-  open(){return new Promise((res,rej)=>{const r=indexedDB.open(DBNAME,1);
-    r.onupgradeneeded=()=>{const d=r.result;SYNCED.forEach(n=>d.createObjectStore(n,{keyPath:'id'}));d.createObjectStore('kv')};
+  open(){return new Promise((res,rej)=>{const r=indexedDB.open(DBNAME,2);
+    r.onupgradeneeded=()=>{const d=r.result;SYNCED.forEach(n=>{if(!d.objectStoreNames.contains(n))d.createObjectStore(n,{keyPath:'id'})});if(!d.objectStoreNames.contains('kv'))d.createObjectStore('kv')};
     r.onsuccess=()=>{this.db=r.result;res()};r.onerror=()=>rej(r.error)})},
   tx(store,mode,fn){return new Promise((res,rej)=>{const t=this.db.transaction(store,mode);const s=t.objectStore(store);let out;
     try{out=fn(s)}catch(e){rej(e);return}
@@ -73,7 +73,7 @@ const IDB={db:null,
 };
 
 /* ========== state ========== */
-const S={products:new Map(),parties:new Map(),docs:new Map(),money:new Map(),users:new Map(),meta:new Map()};
+const S={products:new Map(),parties:new Map(),docs:new Map(),money:new Map(),users:new Map(),meta:new Map(),imgs:new Map()};
 let ME=null;
 let DEV={tag:'',counter:0};
 let SYNC={owner:'',repo:'',branch:'main',token:'',sha:{},last:0};
@@ -89,6 +89,7 @@ async function loadAll(){
 }
 const saveKV=()=>{IDB.put('kv',DEV,'device');IDB.put('kv',SYNC,'sync');IDB.put('kv',DIRTY,'dirty')};
 function shardOf(store,r){
+  if(store==='imgs')return 'imgs-'+imgBucket(r.id);
   if(store==='docs'||store==='money')return store+'-'+String(r.date||'0000-00').slice(0,7);
   return store;
 }
