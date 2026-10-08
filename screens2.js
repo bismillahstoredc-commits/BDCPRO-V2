@@ -18,6 +18,18 @@ SCR.products=()=>{
   paint();
 };
 
+/* ========== লো-স্টক পণ্য পেজ ========== */
+SCR.lowstock=()=>{
+  const L=lowProducts();let need=0;
+  const body=L.map(p=>{const s=stockOf(p.id),n=lowNeed(p);need+=n*num(p.buyPrice);
+    return [`${esc(p.name)}${p.barcode?`<br><small style="color:var(--m)">▮ ${esc(p.barcode)}</small>`:''}`,esc(p.category||'-'),`<span style="color:var(--r);font-weight:700">${r2(s)} ${esc(p.unit||'')}</span>`,`${r2(p.low)}`,`${r2(n)}`,money(p.buyPrice),`<button class="btn o s" data-e="${p.id}">এডিট</button>`]});
+  view(`<div class="card"><div class="row sp"><h3 style="margin:0">⚠ লো-স্টক পণ্য (${L.length})</h3>${L.length?'<button class="btn" id="lbuy">📥 সব ক্রয়ে নিন</button>':''}</div>
+  <p style="color:var(--m);font-size:13px;margin:6px 0 0">যেসব পণ্যের স্টক এলার্ট লেভেল বা তার কম। "প্রয়োজন" = এলার্ট লেভেলে পৌঁছাতে যতটা লাগবে। আনুমানিক ক্রয় খরচ ${money(need)}।</p></div>
+  <div class="card">${L.length?tblc(['নাম','ক্যাটাগরি','>স্টক','>এলার্ট','>প্রয়োজন','>ক্রয় মূল্য',''],body,['মোট '+L.length+'টি','','','','','','']):'<div class="empty">✓ কোনো লো-স্টক পণ্য নেই</div>'}</div>`);
+  if($('#lbuy'))$('#lbuy').onclick=()=>lowToPurchase(L.map(p=>p.id));
+  $$('[data-e]').forEach(b=>b.onclick=()=>productForm(S.products.get(b.dataset.e),()=>SCR.lowstock()));
+};
+
 /* ========== ক্যাটাগরি ও একক ম্যানেজমেন্ট ========== */
 function listPage(kind){
   const k=LK[kind];

@@ -5,7 +5,7 @@ const MENU=[
  ['বিক্রয়'],['pos:sale','🛒','নতুন বিক্রয়'],['pos:sale_order','📝','বিক্রয় অর্ডার'],['pos:sale_return','↩️','বিক্রয় ফেরত'],['pos:free','🎁','ফ্রি আইটেম'],
  ['ক্রয়'],['pos:purchase','📥','নতুন ক্রয়'],['pos:purchase_order','📝','ক্রয় অর্ডার'],['pos:purchase_return','↩️','ক্রয় ফেরত'],
  ['হিসাব'],['invoices','🧾','ইনভয়েস তালিকা'],['due','💳','দেনা-পাওনা'],['expense','💸','খরচ'],['cash','🏦','ক্যাশ ও ব্যাংক'],
- ['পণ্য'],['products','📦','পণ্যসমূহ'],['categories','🗂️','ক্যাটাগরি'],['units','📏','একক'],['তালিকা'],['parties','👥','পার্টি (কাস্টমার/সাপ্লায়ার)'],
+ ['পণ্য'],['products','📦','পণ্যসমূহ'],['lowstock','⚠️','লো-স্টক পণ্য'],['categories','🗂️','ক্যাটাগরি'],['units','📏','একক'],['তালিকা'],['parties','👥','পার্টি (কাস্টমার/সাপ্লায়ার)'],
  ['রিপোর্ট'],['reports','📊','রিপোর্ট'],
  ['ইউটিলিটি'],['reset','🔧','অ্যাকাউন্ট রিসেট','owner'],
 ['সেটিংস'],['settings','⚙️','সেটিংস','owner']
@@ -55,7 +55,7 @@ SCR.dash=()=>{
   `:''}<div class="grid g4"><div class="stat g"><small>আজকের বিক্রয় (${n}টি)</small><div>${money(sale)}</div></div><div class="stat o"><small>আজকের ক্রয়</small><div>${money(pur)}</div></div><div class="stat r"><small>আজকের খরচ</small><div>${money(exp)}</div></div><div class="stat"><small>স্টক মূল্য</small><div>${money(sv)}</div></div></div>
   <div class="grid g4" style="margin-top:10px">${OWN?`<div class="stat g"><small>ক্যাশ ব্যালেন্স</small><div>${money(X.cash)}</div></div><div class="stat"><small>ব্যাংক ব্যালেন্স</small><div>${money(X.bank)}</div></div><div class="stat o"><small>উত্তোলনযোগ্য লাভ</small><div>${money(Math.max(profitAll().avail,0))}</div></div>`:''}<div class="stat g"><small>কাস্টমারের কাছে পাওনা</small><div>${money(recv)}</div></div><div class="stat r"><small>সাপ্লায়ারকে দেনা</small><div>${money(pay)}</div></div></div>
   <div class="card" style="margin-top:12px"><h3>গত ৭ দিনের বিক্রয়</h3><div class="bars">${Object.entries(days).map(([d,v])=>`<div><i style="height:${Math.round(v/mx*80)}px"></i>${d.slice(8)}</div>`).join('')}</div></div>
-  <div class="card"><h3>দ্রুত কাজ</h3><div class="row"><button class="btn" data-go="pos:sale">🛒 নতুন বিক্রয়</button><button class="btn o" data-go="pos:purchase">📥 নতুন ক্রয়</button><button class="btn o" data-go="expense">💸 খরচ</button><button class="btn o" data-go="due">💳 দেনা-পাওনা</button>${low?`<button class="btn d" data-go="products">⚠ লো-স্টক (${low})</button>`:''}${(xp||xs)?`<button class="btn d" id="exb" data-go="products">⏰ মেয়াদ: ${xp?xp+'টি শেষ':''}${xp&&xs?', ':''}${xs?xs+'টি ৩০ দিনে শেষ হবে':''}</button>`:''}</div></div>
+  <div class="card"><h3>দ্রুত কাজ</h3><div class="row"><button class="btn" data-go="pos:sale">🛒 নতুন বিক্রয়</button><button class="btn o" data-go="pos:purchase">📥 নতুন ক্রয়</button><button class="btn o" data-go="expense">💸 খরচ</button><button class="btn o" data-go="due">💳 দেনা-পাওনা</button>${low?`<button class="btn d" data-go="lowstock">⚠ লো-স্টক (${low})</button>`:''}${(xp||xs)?`<button class="btn d" id="exb" data-go="products">⏰ মেয়াদ: ${xp?xp+'টি শেষ':''}${xp&&xs?', ':''}${xs?xs+'টি ৩০ দিনে শেষ হবে':''}</button>`:''}</div></div>
   <div class="card"><h3>সাম্প্রতিক লেনদেন</h3>${tblc(['ইনভয়েস','তারিখ','পার্টি','>মোট'],recent.map(d=>[`<a href="#" data-view="${d.id}">${esc(d.no)}</a> <span class="bd bp">${TYPES[d.type].l}</span>`,d.date,partyName(d.partyId),money(d.total)]))}</div>`);
   if($('#exb'))$('#exb').addEventListener('click',()=>{PF=xp?'exp':'soon'},true);
   if($('#dh_eye'))$('#dh_eye').onclick=()=>{DASH.hide=!DASH.hide;localStorage.setItem('bdcDashHide',DASH.hide?'1':'0');SCR.dash()};
@@ -168,7 +168,7 @@ SCR.pos=a=>{const type=a.type;if(!POS||POS.type!==type||a.pre){posStart(type,a.p
 function paintPOS(){
   const T=TYPES[POS.type];
   const plist=live('parties').filter(p=>p.type===T.party).sort((a,b)=>a.name.localeCompare(b.name));
-  view(`<div class="pos"><div class="pos-l card"><div class="row"><input id="pq" placeholder="নাম / বারকোড দিয়ে খুঁজুন..." value="${esc(POS.q)}" style="flex:1;min-width:140px"><button class="btn s" id="pscan">📷 স্ক্যান</button><button class="btn o s" id="pnew">+ নতুন পণ্য</button></div><div class="pg" id="pg"></div></div>
+  view(`<div class="pos"><div class="pos-l card"><div class="row"><input id="pq" placeholder="নাম / বারকোড দিয়ে খুঁজুন..." value="${esc(POS.q)}" style="flex:1;min-width:140px"><button class="btn s" id="pscan">📷 স্ক্যান</button><button class="btn o s" id="pnew">+ নতুন পণ্য</button></div>${POS.type==='purchase'||POS.type==='purchase_order'?'<div id="plow"></div>':''}<div class="pg" id="pg"></div></div>
   <div class="pos-r card"><h3>${T.l}${POS.editId?' (এডিট)':''}</h3>
    <div class="grid g2"><div class="f"><label>তারিখ</label><input type="date" id="pd" value="${POS.date}"></div>
    <div class="f"><label>${T.party==='supplier'?'সাপ্লায়ার':'কাস্টমার'}${T.need?' *':''}</label><div class="row" style="flex-wrap:nowrap"><select id="pparty"><option value="">${T.need?'-- নির্বাচন --':'ওয়াক-ইন / কেউ না'}</option>${plist.map(p=>`<option value="${p.id}" ${p.id===POS.partyId?'selected':''}>${esc(p.name)}</option>`).join('')}</select><button class="btn o s" id="pnp">+</button></div></div></div>
@@ -213,7 +213,31 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Enter'){if(SCB.length>=3){e.preventDefault();scanCode(SCB)}SCB='';return}
   if(e.key.length===1){if(now-SCT>80)SCB='';SCB+=e.key;SCT=now}
 });
+/* ========== লো-স্টক ========== */
+const lowProducts=()=>live('products').filter(p=>num(p.low)>0&&stockOf(p.id)<=num(p.low)).sort((a,b)=>(stockOf(a.id)-num(a.low))-(stockOf(b.id)-num(b.low))||a.name.localeCompare(b.name));
+const lowNeed=p=>Math.max(1,r2(num(p.low)-stockOf(p.id))); // এলার্ট লেভেলে পৌঁছাতে যতটা লাগে (ন্যূনতম ১)
+function lowToPurchase(ids){
+  if(POS&&(POS.type!=='purchase'||POS.editId)&&POS.items.length&&!confirm('চলমান '+(TYPES[POS.type]?TYPES[POS.type].l:'এন্ট্রি')+'-এর তালিকা মুছে যাবে। চালিয়ে যাবেন?'))return;
+  if(!POS||POS.type!=='purchase'||POS.editId)POS=null;
+  go('pos:purchase',{});
+  ids.forEach(id=>{const p=S.products.get(id);if(p&&!p.del&&!POS.items.some(i=>i.pid===p.id))addItem(p,lowNeed(p))});
+}
+function paintLow(){
+  const box=$('#plow');if(!box||!POS)return;
+  const L=lowProducts();
+  if(!L.length){box.innerHTML='';return}
+  const inCart={};POS.items.forEach(i=>{inCart[i.pid]=(inCart[i.pid]||0)+num(i.qty)});
+  const op=box.querySelector('details')?box.querySelector('details').open:true;
+  const sl=box.querySelector('[data-lscroll]'),st=sl?sl.scrollTop:0;
+  box.innerHTML=`<details ${op?'open':''} style="margin:8px 0;border:1px solid var(--o);border-radius:10px;background:var(--pll)"><summary style="padding:9px 12px;cursor:pointer;font-weight:700;color:var(--r)">⚠ লো-স্টক পণ্য (${L.length})</summary><div style="padding:0 8px 8px"><button class="btn s" id="lowall" type="button" style="width:100%;margin-bottom:6px">+ সব লো পণ্য যোগ করুন</button><div data-lscroll="1" style="max-height:30vh;overflow:auto">${L.map(p=>{const c=inCart[p.id]||0;return `<div data-low="${p.id}" style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 6px;border-bottom:1px solid var(--b);cursor:pointer"><span style="min-width:0"><b style="font-size:13px">${esc(p.name)}</b><br><small style="color:var(--m)">স্টক ${r2(stockOf(p.id))} / এলার্ট ${r2(p.low)} ${esc(p.unit||'')}</small></span><span style="white-space:nowrap;font-size:12px;color:${c?'var(--g)':'var(--pd)'}">${c?'✓ কার্টে '+r2(c):'+ '+r2(lowNeed(p))}</span></div>`}).join('')}</div></div></details>`;
+  {const n=box.querySelector('[data-lscroll]');if(n)n.scrollTop=st}
+  box.onclick=e=>{
+    if(e.target.closest('#lowall')){e.preventDefault();L.forEach(p=>{if(!POS.items.some(i=>i.pid===p.id))addItem(p,lowNeed(p))});return}
+    const r=e.target.closest('[data-low]');if(!r)return;
+    const p=S.products.get(r.dataset.low);if(p&&!POS.items.some(i=>i.pid===p.id))addItem(p,lowNeed(p));else if(p){const it=POS.items.find(i=>i.pid===p.id);if(it){it.qty=num(it.qty)+1;autoPrice(it);paintCart()}}};
+}
 function updateBadges(){
+  try{paintLow()}catch(e){}
   const g=$('#pg');if(!g||!POS)return;
   const q={};POS.items.forEach(i=>{q[i.pid]=(q[i.pid]||0)+num(i.qty)});
   g.querySelectorAll('[data-pid]').forEach(t=>{
