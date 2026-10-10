@@ -9,7 +9,7 @@ function invData(d){
   const pcv=d.payCash!==undefined?num(d.payCash):(d.method==='bank'?0:num(d.paid)),pbv=d.payBank!==undefined?num(d.payBank):(d.method==='bank'?num(d.paid):0);
   const dueNow=t.money?docDue(d):0,pd=p?dueOf(p):0;
   const rows=(d.items||[]).map((i,n)=>{const pr=S.products.get(i.pid);return{n:n+1,name:i.name,qty:r2(i.qty),unit:pr&&pr.unit?pr.unit:'',price:(t.price||d.type==='free')?num(i.price):null,amt:num(i.qty)*num(i.price)}});
-  return{b,p,t,d,isTx,pcv,pbv,dueNow,pd,prev:(p&&isTx)?r2(pd-dueNow):0,laterList:isTx?(X.exl[d.id]||[]):[],rows,free:d.type==='free',logo:b.logo||LOGO_URI,
+  return{b,p,t,d,isTx,pcv,pbv,dueNow,pd,prev:(p&&isTx)?r2(pd-dueNow):0,laterList:isTx?(X.exl[d.id]||[]):[],rows,free:d.type==='free',fi:(d.freeItems||[]).filter(x=>num(x.qty)>0),logo:b.logo||LOGO_URI,
     title:t.l+(t.order?'':' ইনভয়েস'),partyLabel:p?(p.type==='supplier'?'সাপ্লায়ার':'কাস্টমার'):'',words:d.type==='free'?'':takaWords(d.total)};
 }
 function invSumRows(v){
@@ -39,7 +39,7 @@ const SIGF="'Great Vibes','Dancing Script','Segoe Script','Lucida Handwriting','
 const sellerSign=b=>b.sigOff?'':(b.sigImg?`<img class="sgi" src="${b.sigImg}">`:`<span class="sgf" style="font-size:${(b.sigText||'Bismillah Distribution Center').length>18?21:28}px">${esc(b.sigText||'Bismillah Distribution Center')}</span>`);
 const sigBlock=v=>`<div class="sg"><span>গ্রহীতার স্বাক্ষর</span><span class="sv">${sellerSign(v.b)}<i>বিক্রেতার স্বাক্ষর</i></span></div>`;
 const sigThermal=v=>v.b.sigOff?'':`<div class="c" style="margin-top:8px">${sellerSign(v.b)}<div style="font-size:9px;border-top:1px solid #000;display:inline-block;padding-top:1px;min-width:60%">বিক্রেতার স্বাক্ষর</div></div>`;
-const freeNote=v=>v.free?`<div class="fr">ফ্রি আইটেম — মূল্য নেওয়া হয়নি</div>`:'';
+const freeNote=v=>(v.fi&&v.fi.length?`<div class="fr">🎁 ফ্রি আইটেম (মূল্য নেওয়া হয়নি): ${v.fi.map(x=>esc(x.name)+' × '+r2(x.qty)).join(', ')}</div>`:'')+(v.free?`<div class="fr">ফ্রি আইটেম — মূল্য নেওয়া হয়নি</div>`:'');
 const wordsLine=v=>v.words?`<div class="wd">কথায়: ${v.words}</div>`:'';
 
 const BASE=`*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:'Hind Siliguri','Noto Sans Bengali',Arial,sans-serif;margin:0 auto;color:#111}table{width:100%;border-collapse:collapse}.n{text-align:right}.c{text-align:center}.ft{text-align:center;margin-top:10px}.note{margin-top:6px}.sm td{padding:3px 4px}.sm tr.big td{font-weight:700}.sm tr.b td{font-weight:700}.sm tr.r td:last-child{color:#b91c1c;font-weight:700}.sm tr.g td:last-child{color:#166534}.wd{margin-top:8px;font-style:italic}.fr{text-align:center;font-weight:700;margin:8px 0}.stamp{display:inline-block;border:2px solid;border-radius:6px;padding:1px 10px;font-weight:700;transform:rotate(-6deg)}.stamp.red{color:#b91c1c}.stamp.grn{color:#166534}.sgf{font-family:${SIGF};font-size:28px;color:#1e3a8a;display:inline-block;transform:rotate(-3deg);line-height:1.1}.sg .sgf,.sg .sgi{border-top:0!important;padding-top:0!important;min-width:0!important}.sgi{max-height:46px;max-width:170px;object-fit:contain}.sg span.sv{display:inline-flex;flex-direction:column;align-items:center;justify-content:flex-end;border-top:0!important;padding-top:0!important}.sg span.sv i{font-style:normal;border-top:1px solid #000;padding-top:3px;min-width:150px;text-align:center;display:block}`;

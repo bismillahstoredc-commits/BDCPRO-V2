@@ -2,7 +2,7 @@
 /* ========== menu & router ========== */
 const MENU=[
  ['প্রধান'],['dash','🏠','ড্যাশবোর্ড'],
- ['বিক্রয়'],['pos:sale','🛒','নতুন বিক্রয়'],['pos:sale_order','📝','বিক্রয় অর্ডার'],['pos:sale_return','↩️','বিক্রয় ফেরত'],['pos:free','🎁','ফ্রি আইটেম'],
+ ['বিক্রয়'],['pos:sale','🛒','নতুন বিক্রয়'],['pos:sale_order','📝','বিক্রয় অর্ডার'],['pos:sale_return','↩️','বিক্রয় ফেরত'],['pos:free','🎁','ফ্রি আইটেম'],['freestock','🆓','কোম্পানির ফ্রি আইটেম'],
  ['ক্রয়'],['pos:purchase','📥','নতুন ক্রয়'],['pos:purchase_order','📝','ক্রয় অর্ডার'],['pos:purchase_return','↩️','ক্রয় ফেরত'],
  ['হিসাব'],['invoices','🧾','ইনভয়েস তালিকা'],['due','💳','দেনা-পাওনা'],['expense','💸','খরচ'],['cash','🏦','ক্যাশ ও ব্যাংক'],
  ['পণ্য'],['products','📦','পণ্যসমূহ'],['lowstock','⚠️','লো-স্টক পণ্য'],['photos','🖼','পণ্যের ছবি ইমপোর্ট'],['categories','🗂️','ক্যাটাগরি'],['units','📏','একক'],['তালিকা'],['parties','👥','পার্টি (কাস্টমার/সাপ্লায়ার)'],
@@ -156,7 +156,7 @@ function posStart(type,pre){
   POS={type,editId:pre?.id||null,fromOrder:pre?.fromOrder||null,date:pre?.date||today(),partyId:pre?.partyId||'',
    items:pre?.items?pre.items.map(i=>({pid:i.pid,name:i.name,qty:i.qty,price:i.price,cost:i.cost,manual:true})):[],
    dm:pre?.discMode||'amt',dv:pre?(pre.discMode==='pct'?num(pre.discVal):num(pre.disc)):0,
-   pay:'cash',pa:'',pc:0,pb:0,note:pre?.note||'',q:''};
+   pay:'cash',pa:'',pc:0,pb:0,note:pre?.note||'',q:'',free:pre?.freeItems?pre.freeItems.map(x=>({pid:x.pid,name:x.name,qty:x.qty})):[]};
   if(pre&&pre.id){ // এডিটের সময় আগের পেমেন্ট ফিরিয়ে আনা
     const paid=num(pre.paid),total=num(pre.total),bank=pre.method==='bank';
     const pc=pre.payCash!==undefined?num(pre.payCash):(bank?0:paid),pb=pre.payBank!==undefined?num(pre.payBank):(bank?paid:0);
@@ -174,10 +174,10 @@ function paintPOS(){
   <div class="pos-r card"><h3>${T.l}${POS.editId?' (এডিট)':''}</h3>
    <div class="grid g2"><div class="f"><label>তারিখ</label><input type="date" id="pd" value="${POS.date}"></div>
    <div class="f"><label>${T.party==='supplier'?'সাপ্লায়ার':'কাস্টমার'}${T.need?' *':''}</label><div class="row" style="flex-wrap:nowrap"><select id="pparty"><option value="">${T.need?'-- নির্বাচন --':'ওয়াক-ইন / কেউ না'}</option>${plist.map(p=>`<option value="${p.id}" ${p.id===POS.partyId?'selected':''}>${esc(p.name)}</option>`).join('')}</select><button class="btn o s" id="pnp">+</button></div></div></div>
-   <div id="cart"></div><div class="sm" id="sm"></div>
+   <div id="cart"></div><div class="sm" id="sm"></div>${POS.type==='sale'?'<div id="fsec"></div>':''}
    <div class="f"><label>নোট</label><input id="pnote" value="${esc(POS.note)}"></div>
    <div class="row"><button class="btn gr" id="psave" style="flex:1">${POS.editId?'আপডেট করুন':'সেভ করুন'}</button><button class="btn o" id="pprint">সেভ ও প্রিন্ট</button><button class="btn o" id="pclr">রিসেট</button></div></div></div>`);
-  paintGrid();paintCart();
+  paintGrid();paintCart();paintFree();
   $('#pq').oninput=e=>{POS.q=e.target.value;paintGrid()};
   $('#pq').onkeydown=e=>{if(e.key!=='Enter')return;e.preventDefault();const c=e.target.value.trim();if(!c)return;
     if(findByBarcode(c)){scanCode(c);return}
@@ -333,12 +333,14 @@ async function posSave(print){
   if(T.stock<0){const old=POS.editId?S.docs.get(POS.editId):null;
     for(const it of POS.items){let s=stockOf(it.pid);if(old&&TYPES[old.type].stock<0)s+=(old.items.find(x=>x.pid===it.pid)?.qty||0);
       if(s-num(it.qty)<0&&!confirm(`${it.name}: স্টক ${r2(s)}, বিক্রি ${it.qty}। তবুও সেভ করবেন?`))return}}
+  let frList=null;if(POS.type==='sale'){frList=freeCheck();if(frList===null)return}
   const doc=POS.editId?{...S.docs.get(POS.editId)}:{id:uid(),no:nextNo(T.pre),createdAt:Date.now()};
   const oldCost={};(doc.items||[]).forEach(i=>oldCost[i.pid]=i.cost);
   Object.assign(doc,{type:POS.type,date:POS.date||today(),partyId:POS.partyId||'',
     items:POS.items.map(i=>({pid:i.pid,name:i.name,qty:num(i.qty),price:num(i.price),cost:T.price==='buyPrice'?num(i.price):(oldCost[i.pid]??num(S.products.get(i.pid)?.buyPrice??i.cost))})),
     sub:o.sub,disc:o.disc,discMode:POS.dm,discVal:num(POS.dv),total:T.price?o.total:0,paid,
     payCash:T.money?o.pc:0,payBank:T.money?o.pb:0,method:(T.money&&o.pb>0&&o.pc<=0)?'bank':'cash',note:POS.note});
+  if(frList)doc.freeItems=frList;else if(POS.type==='sale')doc.freeItems=[];
   if(T.order)doc.status=doc.status||'open';
   await save('docs',doc);
   if(POS.type==='purchase'){const ups=[];POS.items.forEach(i=>{const p=S.products.get(i.pid);if(!p)return;const np={...p};let ch=false;if(num(p.buyPrice)!==num(i.price)){np.buyPrice=num(i.price);repriceAuto(np);ch=true}if(i.exp&&i.exp!==p.expiry){np.expiry=i.exp;ch=true}if(ch)ups.push(np)});if(ups.length)await saveMany('products',ups)}
