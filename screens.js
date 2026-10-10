@@ -240,6 +240,7 @@ function paintLow(){
 }
 function updateBadges(){
   try{paintLow()}catch(e){}
+  try{freeSoon()}catch(e){}
   const g=$('#pg');if(!g||!POS)return;
   const q={};POS.items.forEach(i=>{q[i.pid]=(q[i.pid]||0)+num(i.qty)});
   g.querySelectorAll('[data-pid]').forEach(t=>{
