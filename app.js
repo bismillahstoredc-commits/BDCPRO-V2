@@ -60,7 +60,7 @@ function authRestore(){
 }
 function authLogin(){
   const us=live('users').filter(u=>u.active);
-  showAuth(`<h2>${esc(biz().name||'BDC PRO v2')}</h2><div class="f"><label>ব্যবহারকারী</label><select id="lu">${us.map(u=>`<option value="${u.id}">${esc(u.name)} (${u.role==='owner'?'মালিক':'স্টাফ'})</option>`).join('')}</select></div>
+  showAuth(`<h2>${biz().name?shopNameUI(biz()):'BDC PRO v2'}</h2><div class="f"><label>ব্যবহারকারী</label><select id="lu">${us.map(u=>`<option value="${u.id}">${esc(u.name)} (${u.role==='owner'?'মালিক':'স্টাফ'})</option>`).join('')}</select></div>
   <div class="f"><label>পাসওয়ার্ড</label><input id="lp" type="password"></div><button class="btn" style="width:100%" id="go">লগইন</button>`);
   const go=async()=>{const u=S.users.get($('#lu').value);if(!u||await sha256(u.salt+':'+$('#lp').value)!==u.hash)return toast('পাসওয়ার্ড ভুল','e');
     ME=u;localStorage.setItem(UIDK,u.id);boot()};
@@ -177,7 +177,7 @@ async function boot(){
   const sid=localStorage.getItem(UIDK);ME=sid?S.users.get(sid):null;
   if(!ME||ME.del||!ME.active){ME=null;hideSplash();return authLogin()}
   $('#auth').style.display='none';$('#app').style.display='flex';
-  $('#tbz').textContent=biz().name||'';buildMenu();setStatus();
+  $('#tbz').textContent=biz().name||'';applyTopName();buildMenu();setStatus();
   if(!window.__booted&&$('#splash')){ // প্রথমবার খোলার সময়: ডাটা সিঙ্ক (বা লোড) হওয়া পর্যন্ত স্প্ল্যাশ দেখানো, তারপর আগের জায়গায় খোলা
     window.__booted=true;
     const so=syncOn()&&navigator.onLine,t0=Date.now();
@@ -204,7 +204,7 @@ async function boot(){
 }
 window.onSynced=()=>{
   ME=S.users.get(ME&&ME.id)||ME;if(ME&&(ME.del||!ME.active)){localStorage.removeItem(UIDK);location.reload();return}
-  $('#tbz').textContent=biz().name||'';syncProfName();
+  $('#tbz').textContent=biz().name||'';applyTopName();syncProfName();
   if(!modalOpen()&&['dash','invoices','parties','products','lowstock','photos','freestock','categories','units','due','expense','cash'].includes(CUR.r))go(CUR.r,CUR.a);
   toast('নতুন তথ্য সিঙ্ক হয়েছে','k');
 };
@@ -224,6 +224,7 @@ SCR.settings=()=>{
   <div class="grid g2"><div class="f"><label>শুরুর ক্যাশ ব্যালেন্স</label><input id="oc" type="number" value="${num(b.openCash)}"></div><div class="f"><label>শুরুর ব্যাংক ব্যালেন্স</label><input id="ob" type="number" value="${num(b.openBank)}"></div></div>
   <div class="grid g2"><div class="f"><label>ডিফল্ট ইনভয়েস ডিজাইন</label><select id="bd">${DESIGNS.map(([k,l])=>`<option value="${k}">${l}</option>`).join('')}</select></div>
   <div class="f"><label>সেভ করলে অটো প্রিন্ট</label><select id="bap"><option value="">না</option><option value="1">হ্যাঁ</option></select></div></div>
+  ${nfCard()}
   <div class="f"><label>লোগো (ছোট করে সেভ হবে)</label><input type="file" id="bl" accept="image/*"></div>
   <h3 style="margin-top:14px">✍ বিক্রেতার সাইন (ইনভয়েসে)</h3>
   <div class="grid g2"><div class="f"><label>সাইনের লেখা (সিগনেচার ফন্টে)</label><input id="bst" value="${esc(b.sigText||'Bismillah Distribution Center')}"></div><div class="f"><label>ইনভয়েসে সাইন দেখাবে?</label><select id="bso"><option value="">হ্যাঁ</option><option value="1">না</option></select></div></div>
@@ -235,9 +236,9 @@ SCR.settings=()=>{
   <div class="grid g2"><div class="f"><label>GitHub ইউজারনেম</label><input id="go1" value="${esc(SYNC.owner)}"></div><div class="f"><label>Repository (প্রাইভেট)</label><input id="gr" value="${esc(SYNC.repo)}"></div><div class="f"><label>ব্রাঞ্চ</label><input id="gb" value="${esc(SYNC.branch||'main')}"></div><div class="f"><label>অ্যাক্সেস টোকেন</label><input id="gt" type="password" value="${esc(SYNC.token)}"></div></div>
   <div class="row"><button class="btn" id="gsv">সংযোগ পরীক্ষা ও সেভ</button><button class="btn gr" id="gsy">এখনই সিঙ্ক</button><button class="btn o" id="gall">সব ডেটা আপলোড</button></div><p id="gst" style="font-size:13px;color:var(--m)">${SYNC.last?'সর্বশেষ সিঙ্ক: '+new Date(SYNC.last).toLocaleString():''}</p></div>
   <div class="card"><h3>ব্যাকআপ ও স্টোরেজ</h3><div class="row"><button class="btn" id="ex">ব্যাকআপ ডাউনলোড (JSON)</button><label class="btn o" style="margin:0">ব্যাকআপ ফাইল থেকে ফিরিয়ে আনুন<input type="file" id="im" accept=".json" hidden></label></div><p id="stg" style="font-size:13px;color:var(--m)"></p></div>`);
-  $('#bd').value=b.design||'t80';$('#bso').value=b.sigOff?'1':'';$('#bap').value=b.autoPrint?'1':'';
-  $('#bsv').onclick=async()=>{const rec={...biz(),name:$('#bn').value.trim(),phone:$('#bp').value.trim(),address:$('#ba').value.trim(),footer:$('#bf').value.trim(),openCash:num($('#oc').value),openBank:num($('#ob').value),design:$('#bd').value,autoPrint:$('#bap').value?1:0};
-    const f=$('#bl').files[0];if(f)rec.logo=await shrink(f);rec.sigText=$('#bst').value.trim()||'Bismillah Distribution Center';rec.sigOff=$('#bso').value?1:0;const sf=$('#bsi').files[0];if(sf)rec.sigImg=await shrink(sf);else if($('#bsr')&&$('#bsr').checked)delete rec.sigImg;await save('meta',rec);syncProfName();$('#tbz').textContent=rec.name;toast('সেভ হয়েছে','k');SCR.settings()};
+  $('#bd').value=b.design||'t80';nfBind(b);$('#bso').value=b.sigOff?'1':'';$('#bap').value=b.autoPrint?'1':'';
+  $('#bsv').onclick=async()=>{const rec={...biz(),name:$('#bn').value.trim(),phone:$('#bp').value.trim(),address:$('#ba').value.trim(),footer:$('#bf').value.trim(),openCash:num($('#oc').value),openBank:num($('#ob').value),design:$('#bd').value,autoPrint:$('#bap').value?1:0,...nfRead()};
+    const f=$('#bl').files[0];if(f)rec.logo=await shrink(f);rec.sigText=$('#bst').value.trim()||'Bismillah Distribution Center';rec.sigOff=$('#bso').value?1:0;const sf=$('#bsi').files[0];if(sf)rec.sigImg=await shrink(sf);else if($('#bsr')&&$('#bsr').checked)delete rec.sigImg;await save('meta',rec);syncProfName();$('#tbz').textContent=rec.name;applyTopName();toast('সেভ হয়েছে','k');SCR.settings()};
   const ul=()=>{$('#ul').innerHTML=tblc(['নাম','ইউজারনেম','ভূমিকা','স্ট্যাটাস',''],live('users').map(u=>[esc(u.name),esc(u.username),u.role==='owner'?'মালিক':'স্টাফ',u.active?'<span class="bd bg">সক্রিয়</span>':'<span class="bd br">বন্ধ</span>',u.role==='owner'&&u.id===ME.id?'':`<div class="row" style="flex-wrap:nowrap"><button class="btn o s" data-tg="${u.id}">${u.active?'বন্ধ করুন':'চালু করুন'}</button><button class="btn o s" data-pw="${u.id}">পাসওয়ার্ড</button></div>`]));
     $$('[data-tg]').forEach(x=>x.onclick=async()=>{const u=S.users.get(x.dataset.tg);await save('users',{...u,active:u.active?0:1});ul()});
     $$('[data-pw]').forEach(x=>x.onclick=async()=>{const p=prompt('নতুন পাসওয়ার্ড (কমপক্ষে ৪ অক্ষর):');if(!p||p.length<4)return;const u=S.users.get(x.dataset.pw),salt=uid().slice(0,8);await save('users',{...u,salt,hash:await sha256(salt+':'+p)});toast('পাসওয়ার্ড বদলেছে','k')})};ul();

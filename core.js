@@ -41,7 +41,8 @@ function takaWords(v){v=Math.abs(r2(v));const t=Math.floor(v),ps=Math.round((v-t
 function printHTML(html){
   const f=document.createElement('iframe');f.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0';
   document.body.appendChild(f);const d=f.contentDocument;d.open();d.write(html);d.close();
-  setTimeout(()=>{try{f.contentWindow.focus();f.contentWindow.print()}catch(e){}setTimeout(()=>f.remove(),5000)},350);
+  const go=()=>{try{f.contentWindow.focus();f.contentWindow.print()}catch(e){}setTimeout(()=>f.remove(),5000)};
+  setTimeout(()=>{try{const fr=f.contentWindow.document.fonts;if(fr&&fr.ready){Promise.race([fr.ready,new Promise(r=>setTimeout(r,1800))]).then(()=>setTimeout(go,100));return}}catch(e){}go()},350);
 }
 async function sha256(t){
   if(crypto.subtle){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(t));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}

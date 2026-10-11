@@ -166,7 +166,7 @@ function posStart(type,pre){
     else if(POS.pay==='split'&&pc<=0.001&&pb>0){POS.pay='bank';POS.pa=String(pb)}
   }
 }
-SCR.pos=a=>{const type=a.type;if(!POS||POS.type!==type||a.pre){posStart(type,a.pre)}paintPOS()};
+SCR.pos=a=>{a=a||{};const type=a.type||(POS&&POS.type)||'sale';if(!POS||POS.type!==type||a.pre){posStart(type,a.pre)}paintPOS()};
 function paintPOS(){
   const T=TYPES[POS.type];
   const plist=live('parties').filter(p=>p.type===T.party).sort((a,b)=>a.name.localeCompare(b.name));
