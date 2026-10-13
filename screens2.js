@@ -172,6 +172,15 @@ SCR.reports=()=>{
   paintR();
 };
 const inR=d=>(!RP.from||d.date>=RP.from)&&(!RP.to||d.date<=RP.to);
+/* লাভ-ক্ষতি: নির্দিষ্ট তারিখের আগ পর্যন্ত নীট লাভ ও উত্তোলন (আগের জের হিসাবের জন্য) */
+function profitBefore(from){
+  let rev=0,cogs=0,free=0,ex=0,draw=0;if(!from)return{net:0,draw:0};
+  S.docs.forEach(d=>{if(d.del||!(d.date<from))return;
+    if(d.type==='sale'||d.type==='sale_return'){const k=d.type==='sale'?1:-1;rev+=k*num(d.total);(d.items||[]).forEach(i=>cogs+=k*num(i.qty)*num(i.cost))}
+    if(d.type==='free')(d.items||[]).forEach(i=>free+=num(i.qty)*num(i.cost))});
+  S.money.forEach(m=>{if(m.del||!(m.date<from))return;if(m.kind==='expense')ex+=num(m.amount);if(m.kind==='drawing')draw+=num(m.amount)});
+  return{net:r2(rev-cogs-ex-free),draw:r2(draw)};
+}
 function paintR(){
   const el=$('#rb'),docs=live('docs').filter(inR),T=RP.tab;let h='';
   const dl=t=>docs.filter(d=>d.type===t).sort((a,b)=>byDateDesc(b,a));
@@ -193,7 +202,11 @@ function paintR(){
     h=tblc(['তারিখ','বিবরণ','>ক্যাশ জমা','>ক্যাশ খরচ','>ব্যাংক জমা','>ব্যাংক খরচ'],ev.map(e=>[e.date,esc(e.txt),e.c>0?money(e.c):'',e.c<0?money(-e.c):'',e.b>0?money(e.b):'',e.b<0?money(-e.b):'']),['মোট','',money(ci),money(co),money(bi),money(bo)])}
   else if(T==='pl'&&isOwner()){let rev=0,cogs=0,free=0;docs.forEach(d=>{if(d.type==='sale'||d.type==='sale_return'){const k=d.type==='sale'?1:-1;rev+=k*num(d.total);d.items.forEach(i=>cogs+=k*num(i.qty)*num(i.cost))}if(d.type==='free')d.items.forEach(i=>free+=num(i.qty)*num(i.cost))});
     let ex=0;live('money').filter(m=>m.kind==='expense'&&inR(m)).forEach(m=>ex+=num(m.amount));const gp=rev-cogs,net=gp-ex-free;let dw=0;live('money').filter(m=>m.kind==='drawing'&&inR(m)).forEach(m=>dw+=num(m.amount));const PA=profitAll();
-    h=`<table><tr><td>নীট বিক্রয়</td><td class="n">${money(rev)}</td></tr><tr><td>বিক্রীত পণ্যের ক্রয়মূল্য</td><td class="n">- ${money(cogs)}</td></tr><tr class="tot"><td>মোট লাভ (গ্রস)</td><td class="n">${money(gp)}</td></tr><tr><td>মোট খরচ</td><td class="n">- ${money(ex)}</td></tr><tr><td>ফ্রি আইটেমের ক্রয়মূল্য</td><td class="n">- ${money(free)}</td></tr><tr class="tot"><td>নীট লাভ / (ক্ষতি)</td><td class="n" style="color:${net<0?'var(--r)':'var(--g)'}">${money(net)}</td></tr><tr><td>লভ্যাংশ উত্তোলন (এই সময়ে)</td><td class="n">- ${money(dw)}</td></tr><tr class="tot"><td>অবশিষ্ট লাভ (এই সময়ে)</td><td class="n">${money(net-dw)}</td></tr></table><small style="display:block;margin-top:8px;color:var(--m)">সব সময়ের হিসাবে: মোট নীট লাভ ${money(PA.net)} − মোট উত্তোলন ${money(PA.draw)} = উত্তোলনযোগ্য লাভ <b>${money(Math.max(PA.avail,0))}</b></small>`}
+    const PB=profitBefore(RP.from),open=r2(PB.net-PB.draw),close=r2(open+net-dw),upto=!RP.to||RP.to>=today();
+    const rw=(l,v,c)=>`<tr><td>${l}</td><td class="n"${c?` style="color:${c}"`:''}>${v}</td></tr>`;
+    h=`<table>${rw('নীট বিক্রয়',money(rev))}${rw('− বিক্রীত পণ্যের ক্রয়মূল্য',money(cogs))}<tr class="tot"><td>মোট লাভ (গ্রস)</td><td class="n">${money(gp)}</td></tr>${rw('− মোট খরচ',money(ex))}${free?rw('− ফ্রি আইটেমের ক্রয়মূল্য',money(free)):''}<tr class="tot"><td>এই সময়ের নীট লাভ</td><td class="n" style="color:${net<0?'var(--r)':'var(--g)'}">${money(net)}</td></tr></table>
+    <div style="height:14px"></div>
+    <table>${rw('আগের জের <small style="color:var(--m)">(এই সময়ের আগের অবশিষ্ট লাভ)</small>',money(open))}${rw('+ এই সময়ের নীট লাভ',money(net))}${rw('− এই সময়ে লভ্যাংশ উত্তোলন',money(dw))}<tr class="tot" style="background:var(--pll)"><td>অবশিষ্ট লাভ<br><small style="font-weight:400;color:var(--m)">${upto?'এখন হাতে থাকা, উত্তোলনযোগ্য':'এই সময়ের শেষে'}</small></td><td class="n" style="font-size:1.2em;color:${close<0?'var(--r)':'var(--g)'}">${money(close)}</td></tr></table>${upto?'':`<small style="display:block;margin-top:8px;color:var(--m)">আজ পর্যন্ত মোট অবশিষ্ট (উত্তোলনযোগ্য) লাভ: <b>${money(Math.max(PA.avail,0))}</b></small>`}`}
   else if(T==='bs'&&isOwner()){const X=idx();let recv=0,pay=0,sv=0;S.parties.forEach(p=>{if(p.del)return;const d=dueOf(p);if(p.type==='supplier')pay+=d;else recv+=d});S.products.forEach(p=>{if(!p.del)sv+=Math.max(stockOf(p.id),0)*num(p.buyPrice)});
     const ta=X.cash+X.bank+sv+recv;h=`<div class="grid g2"><div><h3>সম্পদ</h3><table><tr><td>ক্যাশ</td><td class="n">${money(X.cash)}</td></tr><tr><td>ব্যাংক</td><td class="n">${money(X.bank)}</td></tr><tr><td>স্টক মূল্য</td><td class="n">${money(sv)}</td></tr><tr><td>কাস্টমারের কাছে পাওনা</td><td class="n">${money(recv)}</td></tr><tr class="tot"><td>মোট সম্পদ</td><td class="n">${money(ta)}</td></tr></table></div>
     <div><h3>দায় ও মূলধন</h3><table><tr><td>সাপ্লায়ারকে দেনা</td><td class="n">${money(pay)}</td></tr><tr><td>মালিকের মূলধন (নীট)</td><td class="n">${money(ta-pay)}</td></tr><tr><td style="color:var(--m)">— এর মধ্যে অবশিষ্ট লাভ</td><td class="n" style="color:var(--m)">${money(profitAll().avail)}</td></tr><tr><td style="color:var(--m)">— মোট লভ্যাংশ উত্তোলন (আগেই বাদ)</td><td class="n" style="color:var(--m)">${money(profitAll().draw)}</td></tr><tr class="tot"><td>মোট</td><td class="n">${money(ta)}</td></tr></table></div></div><small>ব্যালেন্স শীট সর্বদা বর্তমান অবস্থার হিসাব (তারিখ ফিল্টার প্রযোজ্য নয়)।</small>`}
