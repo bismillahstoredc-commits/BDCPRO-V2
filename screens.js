@@ -2,13 +2,13 @@
 /* ========== menu & router ========== */
 const MENU=[
  ['প্রধান'],['dash','🏠','ড্যাশবোর্ড'],
- ['বিক্রয়'],['pos:sale','🛒','নতুন বিক্রয়'],['pos:sale_order','📝','বিক্রয় অর্ডার'],['pos:sale_return','↩️','বিক্রয় ফেরত'],['pos:free','🎁','ফ্রি আইটেম'],['freestock','🆓','কোম্পানির ফ্রি আইটেম'],
+ ['বিক্রয়'],['pos:sale','🛒','নতুন বিক্রয়'],['pos:sale_order','📝','বিক্রয় অর্ডার'],['pos:sale_return','↩️','বিক্রয় ফেরত'],['pos:free','🎁','ফ্রি আইটেম'],['freestock','🆓','কোম্পানির ফ্রি আইটেম'],['damage','🔁','ড্যামেজ ফেরত ও বদলি'],
  ['ক্রয়'],['pos:purchase','📥','নতুন ক্রয়'],['pos:purchase_order','📝','ক্রয় অর্ডার'],['pos:purchase_return','↩️','ক্রয় ফেরত'],
  ['হিসাব'],['invoices','🧾','ইনভয়েস তালিকা'],['due','💳','দেনা-পাওনা'],['expense','💸','খরচ'],['cash','🏦','ক্যাশ ও ব্যাংক'],
  ['পণ্য'],['products','📦','পণ্যসমূহ'],['lowstock','⚠️','লো-স্টক পণ্য'],['photos','🖼','পণ্যের ছবি ইমপোর্ট'],['categories','🗂️','ক্যাটাগরি'],['units','📏','একক'],['তালিকা'],['parties','👥','পার্টি (কাস্টমার/সাপ্লায়ার)'],
  ['রিপোর্ট'],['reports','📊','রিপোর্ট'],
  ['ইউটিলিটি'],['reset','🔧','অ্যাকাউন্ট রিসেট','owner'],
-['সেটিংস'],['settings','⚙️','সেটিংস','owner']
+['সেটিংস'],['shortcuts','⌨','কিবোর্ড শর্টকাট'],['settings','⚙️','সেটিংস','owner']
 ];
 let CUR={r:'dash',a:null};
 function buildMenu(){
@@ -92,6 +92,9 @@ function productForm(p,cb,pre){
   <div class="f"><label>বারকোড (স্ক্যানার দিয়ে স্ক্যান করুন, ক্যামেরা ব্যবহার করুন বা টাইপ করুন)</label><div class="row" style="flex-wrap:nowrap"><input id="fbc" value="${esc(p?.barcode??pre?.barcode??'')}" placeholder="বারকোড নম্বর"><button class="btn o s" id="fscan" type="button">📷</button><button class="btn o s" id="fgen" type="button">অটো</button></div></div>
   <div class="grid g2"><div class="f"><label>ক্যাটাগরি</label><div class="row" style="flex-wrap:nowrap"><select id="fc">${opt('cat',p?.category||'')}</select><button class="btn o s" id="fcn" type="button">+</button></div></div>
   <div class="f"><label>একক</label><div class="row" style="flex-wrap:nowrap"><select id="fu">${opt('unit',defU)}</select><button class="btn o s" id="fun" type="button">+</button></div></div></div>
+  <div class="f" style="border:1px dashed var(--b);border-radius:10px;padding:10px"><label style="font-weight:700">📦 সাব ইউনিট (ঐচ্ছিক) — যেমন ১ কেস = ১২ পিছ</label>
+  <div class="row" style="flex-wrap:nowrap;align-items:center;gap:6px">১ <b id="fu_l">${esc(defU)}</b> = <input id="frt" type="number" min="0" step="any" value="${hasSub(p)?p.ratio:''}" style="width:80px"> <input id="fsu" list="fsul" placeholder="পিছ" value="${esc(p?.subUnit||'')}" style="width:110px"><datalist id="fsul">${listNames('unit').map(n=>`<option value="${esc(n)}">`).join('')}</datalist></div>
+  <small id="fpp" style="color:var(--m);display:block;margin-top:4px">ক্রয়-বিক্রয়ের দাম মূল ইউনিটের হবে। সাব ইউনিটে (পিছ) বিক্রি করলে দাম নিজে ভাগ হবে।</small></div>
   <div class="grid g2"><div class="f"><label>ক্রয় মূল্য</label><input id="fb" type="number" step="any" value="${p?.buyPrice??0}"></div><div class="f"><label>মেয়াদ উত্তীর্ণের তারিখ (ঐচ্ছিক)</label><input id="fx" type="date" value="${esc(p?.expiry||'')}"></div></div>
   <div class="grid g2"><div class="f"><label>খুচরা বিক্রয় মূল্য</label><input id="fs" type="number" step="any" value="${p?.sellPrice??0}"></div><div class="f"><label>খুচরা লাভ %</label><input id="frp" type="number" step="any"></div></div>
   <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin:-4px 0 10px"><input type="checkbox" id="fra" style="width:auto" ${p?.rAuto?'checked':''}> লাভ % অনুযায়ী খুচরা দাম অটো ঠিক হবে (ক্রয়মূল্য বদলালে বিক্রয়মূল্যও বদলাবে)</label>
@@ -100,10 +103,13 @@ function productForm(p,cb,pre){
   <div class="f"><label>পাইকারী সর্বনিম্ন পরিমাণ (Min Qty)</label><input id="fwm" type="number" step="any" value="${p?.wsMin??0}"></div>
   <small style="color:var(--m);display:block;margin:-4px 0 8px">লাভ % = (বিক্রয়মূল্য − ক্রয়মূল্য) ÷ ক্রয়মূল্য × ১০০। দাম বা % যেকোনো একটি লিখলে অন্যটি নিজে হিসাব হয়।</small>
   <small style="color:var(--m);display:block;margin:-4px 0 8px">বিক্রয়ে পরিমাণ এই সংখ্যা বা তার বেশি হলে দাম নিজে থেকে পাইকারী হয়ে যাবে। দুটোই ০ থাকলে পাইকারী দর বন্ধ।</small>
-  <div class="grid g2"><div class="f"><label>${p?'বর্তমান স্টক (সংশোধন করা যাবে)':'শুরুর স্টক'}</label><input id="fq" type="number" value="${p?r2(stockOf(p.id)):0}"></div><div class="f"><label>লো-স্টক এলার্ট</label><input id="fl" type="number" value="${p?.low??0}"></div></div>
+  <div class="grid g2"><div class="f"><label>${p?'বর্তমান স্টক (সংশোধন করা যাবে)':'শুরুর স্টক'}</label><input id="fq" type="number" step="any" value="${p?(hasSub(p)?splitQty(p,stockOf(p.id)).c:r2(stockOf(p.id))):0}"><input id="fqs" type="number" step="any" placeholder="সাব ইউনিট" value="${p&&hasSub(p)?splitQty(p,stockOf(p.id)).s:''}" style="${p&&hasSub(p)?'':'display:none;'}margin-top:4px"></div><div class="f"><label>লো-স্টক এলার্ট</label><input id="fl" type="number" value="${p?.low??0}"></div></div>
   ${photoField(p)}
   <div class="row"><button class="btn" id="fsv">সেভ করুন</button>${p&&isOwner()?'<button class="btn d" id="fdel">ডিলিট</button>':''}</div>`,()=>{
     photoBind();
+    const FQ0=$('#fq').value,FQS0=$('#fqs').value;
+    const subHint=()=>{const r=num($('#frt').value),sb=$('#fsu').value.trim(),u=$('#fu').value||'';$('#fu_l').textContent=u;$('#fqs').style.display=(r>1&&sb)?'':'none';$('#fpp').textContent=(r>1&&sb)?`প্রতি ${sb}: ক্রয় ৳${r2(num($('#fb').value)/r)}, খুচরা ৳${r2(num($('#fs').value)/r)}${num($('#fw').value)>0?', পাইকারী ৳'+r2(num($('#fw').value)/r):''}`:'ক্রয়-বিক্রয়ের দাম মূল ইউনিটের হবে। সাব ইউনিটে (পিছ) বিক্রি করলে দাম নিজে ভাগ হবে।'};
+    ['#frt','#fsu','#fu','#fb','#fs','#fw'].forEach(x=>{$(x).addEventListener('input',subHint);$(x).addEventListener('change',subHint)});subHint();
     const fb=$('#fb'),fs=$('#fs'),frp=$('#frp'),fra=$('#fra'),fw=$('#fw'),fwp=$('#fwp'),fwa=$('#fwa');
     const pctOf=v=>{const b=num(fb.value);return b>0?r2((num(v)-b)/b*100):''},priceOf=pc=>r2(num(fb.value)*(1+num(pc)/100));
     frp.value=(p&&p.rPct!==''&&p.rPct!=null)?p.rPct:pctOf(fs.value);fwp.value=(p&&p.wPct!==''&&p.wPct!=null)?p.wPct:(num(fw.value)>0?pctOf(fw.value):'');
@@ -120,12 +126,17 @@ function productForm(p,cb,pre){
       if(bc){const dup=live('products').find(x=>x.id!==(p&&p.id)&&(x.barcode||'').trim()===bc);if(dup)return toast('এই বারকোড আগে থেকেই আছে: '+dup.name,'e')}
       const ws=num($('#fw').value),wm=num($('#fwm').value);
       if((ws>0)!==(wm>0))return toast('পাইকারী মূল্য ও সর্বনিম্ন পরিমাণ দুটোই দিন (অথবা দুটোই ০ রাখুন)','e');
+      const ratioV=num($('#frt').value),subU=$('#fsu').value.trim();
+      if(ratioV>0&&ratioV<=1)return toast('সাব ইউনিটের সংখ্যা ১ এর বেশি হতে হবে','e');
+      if(ratioV>1&&(!subU||subU===$('#fu').value))return toast('সাব ইউনিটের নাম লিখুন (মূল ইউনিটের থেকে আলাদা)','e');
+      const hasS=ratioV>1&&!!subU;
       const rec=p||{id:uid(),openQty:0,createdAt:Date.now()};
-      const want=num($('#fq').value);
+      let want=num($('#fq').value)+(hasS?num($('#fqs').value)/ratioV:0);
+      if(p&&$('#fq').value===FQ0&&$('#fqs').value===FQS0)want=stockOf(p.id);
       if(p)rec.openQty=num(rec.openQty)+(want-stockOf(p.id));else rec.openQty=want;
       if($('#fra').checked&&$('#frp').value==='')return toast('খুচরা লাভ % দিন (অথবা অটো বন্ধ করুন)','e');
       if($('#fwa').checked&&$('#fwp').value==='')return toast('পাইকারী লাভ % দিন (অথবা অটো বন্ধ করুন)','e');
-      Object.assign(rec,{name,barcode:bc,category:$('#fc').value.trim(),unit:$('#fu').value.trim()||'pcs',buyPrice:num($('#fb').value),sellPrice:num($('#fs').value),wsPrice:ws,wsMin:wm,low:num($('#fl').value),
+      Object.assign(rec,{name,barcode:bc,category:$('#fc').value.trim(),unit:$('#fu').value.trim()||'pcs',subUnit:hasS?subU:'',ratio:hasS?ratioV:0,buyPrice:num($('#fb').value),sellPrice:num($('#fs').value),wsPrice:ws,wsMin:wm,low:num($('#fl').value),
         expiry:$('#fx').value||'',rPct:$('#frp').value===''?'':num($('#frp').value),rAuto:$('#fra').checked?1:0,wPct:$('#fwp').value===''?'':num($('#fwp').value),wAuto:$('#fwa').checked?1:0});
       repriceAuto(rec);
       await save('products',rec);await photoApply(rec.id);closeModal();toast('সেভ হয়েছে','k');cb&&cb(rec);
@@ -231,7 +242,7 @@ function paintLow(){
   const inCart={};POS.items.forEach(i=>{inCart[i.pid]=(inCart[i.pid]||0)+num(i.qty)});
   const op=box.querySelector('details')?box.querySelector('details').open:true;
   const sl=box.querySelector('[data-lscroll]'),st=sl?sl.scrollTop:0;
-  box.innerHTML=`<details ${op?'open':''} style="margin:8px 0;border:1px solid var(--o);border-radius:10px;background:var(--pll)"><summary style="padding:9px 12px;cursor:pointer;font-weight:700;color:var(--r)">⚠ লো-স্টক পণ্য (${L.length})</summary><div style="padding:0 8px 8px"><button class="btn s" id="lowall" type="button" style="width:100%;margin-bottom:6px">+ সব লো পণ্য যোগ করুন</button><div data-lscroll="1" style="max-height:30vh;overflow:auto">${L.map(p=>{const c=inCart[p.id]||0;return `<div data-low="${p.id}" style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 6px;border-bottom:1px solid var(--b);cursor:pointer"><span style="min-width:0"><b style="font-size:13px">${esc(p.name)}</b><br><small style="color:var(--m)">স্টক ${r2(stockOf(p.id))} / এলার্ট ${r2(p.low)} ${esc(p.unit||'')}</small></span><span style="white-space:nowrap;font-size:12px;color:${c?'var(--g)':'var(--pd)'}">${c?'✓ কার্টে '+r2(c):'+ '+r2(lowNeed(p))}</span></div>`}).join('')}</div></div></details>`;
+  box.innerHTML=`<details ${op?'open':''} style="margin:8px 0;border:1px solid var(--o);border-radius:10px;background:var(--pll)"><summary style="padding:9px 12px;cursor:pointer;font-weight:700;color:var(--r)">⚠ লো-স্টক পণ্য (${L.length})</summary><div style="padding:0 8px 8px"><button class="btn s" id="lowall" type="button" style="width:100%;margin-bottom:6px">+ সব লো পণ্য যোগ করুন</button><div data-lscroll="1" style="max-height:30vh;overflow:auto">${L.map(p=>{const c=inCart[p.id]||0;return `<div data-low="${p.id}" style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 6px;border-bottom:1px solid var(--b);cursor:pointer"><span style="min-width:0"><b style="font-size:13px">${esc(p.name)}</b><br><small style="color:var(--m)">স্টক ${esc(fq(p,stockOf(p.id)))} / এলার্ট ${esc(fq(p,p.low))}</small></span><span style="white-space:nowrap;font-size:12px;color:${c?'var(--g)':'var(--pd)'}">${c?'✓ কার্টে '+esc(fq(p,c)):'+ '+esc(fq(p,lowNeed(p)))}</span></div>`}).join('')}</div></div></details>`;
   {const n=box.querySelector('[data-lscroll]');if(n)n.scrollTop=st}
   box.onclick=e=>{
     if(e.target.closest('#lowall')){e.preventDefault();L.forEach(p=>{if(!POS.items.some(i=>i.pid===p.id))addItem(p,lowNeed(p))});return}
@@ -252,7 +263,7 @@ function paintGrid(){
   const T=TYPES[POS.type],q=POS.q.toLowerCase();
   const rows=live('products').filter(p=>posMatch(p,q)).sort((a,b)=>a.name.localeCompare(b.name)).slice(0,80);
   $('#pg').innerHTML=rows.length?rows.map(p=>{const s=stockOf(p.id);const w=wsOn(POS.type)&&num(p.wsPrice)>0&&num(p.wsMin)>0;
-    return `<div class="pt" data-pid="${p.id}">${imgTag(p.id,'pth')}<b>${esc(p.name)}</b><span>${T.price?money(p[T.price]):'ফ্রি'}</span>${w?`<small style="color:var(--o)">পাইকারী ${money(p.wsPrice)} (${r2(p.wsMin)}+)</small>`:''}<small class="${s<=0?'low':''}">স্টক: ${r2(s)} ${esc(p.unit||'')}</small></div>`}).join(''):'<div class="empty">কোনো পণ্য নেই — "+ নতুন পণ্য" দিন</div>';
+    return `<div class="pt" data-pid="${p.id}">${imgTag(p.id,'pth')}<b>${esc(p.name)}</b><span>${T.price?money(p[T.price])+(hasSub(p)?'/'+esc(p.unit):''):'ফ্রি'}</span>${w?`<small style="color:var(--o)">পাইকারী ${money(p.wsPrice)} (${r2(p.wsMin)}+)</small>`:''}<small class="${s<=0?'low':''}">স্টক: ${esc(fq(p,s))}</small></div>`}).join(''):'<div class="empty">কোনো পণ্য নেই — "+ নতুন পণ্য" দিন</div>';
   updateBadges();
   $('#pg').onclick=e=>{const t=e.target.closest('[data-pid]');if(t)addItem(S.products.get(t.dataset.pid))};
 }
@@ -271,10 +282,10 @@ function addItem(p,qty){
 }
 function paintCart(){
   const T=TYPES[POS.type];
-  $('#cart').innerHTML=POS.items.length?`<div class="cr" style="font-size:11px;color:var(--m)"><span>পণ্য</span><span>পরিমাণ</span><span>দাম</span><span></span></div>`+POS.items.map((it,i)=>`<div class="cr"><span>${esc(it.name)} <span class="bd bo" id="wb${i}" style="${it.ws?'':'display:none'}">পাইকারী</span><br><small id="lt${i}" style="color:var(--pd)">${money(num(it.qty)*num(it.price))}</small>${POS.type==='purchase'?`<br><label style="font-size:11px;color:var(--m)">মেয়াদ <input type="date" data-i="${i}" data-f="exp" value="${esc(it.exp||'')}" style="width:130px;padding:2px 4px;font-size:12px"></label>`:''}</span><input type="number" step="any" data-i="${i}" data-f="qty" value="${it.qty}"><input type="number" step="any" data-i="${i}" data-f="price" value="${it.price}" ${T.price?'':'disabled'}><span class="x" data-x="${i}">✕</span></div>`).join(''):'<div class="empty">বাম দিক থেকে পণ্য ট্যাপ করুন বা বারকোড স্ক্যান করুন</div>';
-  $('#cart').oninput=e=>{const i=e.target.dataset.i;if(i==null)return;const it=POS.items[i],f=e.target.dataset.f;if(f==='exp'){it.exp=e.target.value;return}it[f]=num(e.target.value);
+  $('#cart').innerHTML=POS.items.length?`<div class="cr" style="font-size:11px;color:var(--m)"><span>পণ্য</span><span>পরিমাণ</span><span>দাম</span><span></span></div>`+POS.items.map((it,i)=>`<div class="cr"><span>${esc(it.name)} <span class="bd bo" id="wb${i}" style="${it.ws?'':'display:none'}">পাইকারী</span><br><small id="lt${i}" style="color:var(--pd)">${money(num(it.qty)*num(it.price))}</small>${POS.type==='purchase'?`<br><label style="font-size:11px;color:var(--m)">মেয়াদ <input type="date" data-i="${i}" data-f="exp" value="${esc(it.exp||'')}" style="width:130px;padding:2px 4px;font-size:12px"></label>`:''}</span>${cartQtyCell(it,i)}<input type="number" step="any" data-i="${i}" data-f="price" value="${it.price}" ${T.price?'':'disabled'}><span class="x" data-x="${i}">✕</span></div>`).join(''):'<div class="empty">বাম দিক থেকে পণ্য ট্যাপ করুন বা বারকোড স্ক্যান করুন</div>';
+  $('#cart').oninput=e=>{const i=e.target.dataset.i;if(i==null)return;const it=POS.items[i],f=e.target.dataset.f;if(f==='exp'){it.exp=e.target.value;return}if(f==='qty'||f==='sub'){const pp=S.products.get(it.pid);if(hasSub(pp)){const row=e.target.closest('.cr');it.qty=num(row.querySelector('[data-f="qty"]').value)+num(row.querySelector('[data-f="sub"]').value)/num(pp.ratio)}else it.qty=num(e.target.value)}else it[f]=num(e.target.value);
     if(f==='price')it.manual=true;
-    if(f==='qty'){autoPrice(it);const pi=$(`#cart input[data-i="${i}"][data-f="price"]`);if(pi&&num(pi.value)!==num(it.price))pi.value=it.price}
+    if(f==='qty'||f==='sub'){autoPrice(it);const pi=$(`#cart input[data-i="${i}"][data-f="price"]`);if(pi&&num(pi.value)!==num(it.price))pi.value=it.price}
     $('#lt'+i).textContent=money(num(it.qty)*num(it.price));const wb=$('#wb'+i);if(wb)wb.style.display=it.ws&&!it.manual?'':'none';
     updateBadges();updateSum()};
   $('#cart').onclick=e=>{const x=e.target.dataset.x;if(x!=null){POS.items.splice(x,1);paintCart()}};
@@ -331,9 +342,9 @@ async function posSave(print){
   if(T.money&&(o.pc<0||o.pb<0))return toast('পরিশোধের পরিমাণ ঠিক নয়','e');
   if(T.money&&paid>o.total+0.001)return toast('পরিশোধ মোটের বেশি হতে পারে না','e');
   if(T.money&&o.due>0.001&&!POS.partyId)return toast('বাকি রাখতে হলে পার্টি নির্বাচন করুন','e');
-  if(T.stock<0){const old=POS.editId?S.docs.get(POS.editId):null;
+  if(T.stock<0&&!(POS.editId&&(S.docs.get(POS.editId)||{}).dmg)){const old=POS.editId?S.docs.get(POS.editId):null;
     for(const it of POS.items){let s=stockOf(it.pid);if(old&&TYPES[old.type].stock<0)s+=(old.items.find(x=>x.pid===it.pid)?.qty||0);
-      if(s-num(it.qty)<0&&!confirm(`${it.name}: স্টক ${r2(s)}, বিক্রি ${it.qty}। তবুও সেভ করবেন?`))return}}
+      if(s-num(it.qty)<0&&!confirm(`${it.name}: স্টক ${fq(S.products.get(it.pid),s)}, বিক্রি ${fq(S.products.get(it.pid),it.qty)}। তবুও সেভ করবেন?`))return}}
   let frList=null;if(POS.type==='sale'){frList=freeCheck();if(frList===null)return}
   const doc=POS.editId?{...S.docs.get(POS.editId)}:{id:uid(),no:nextNo(T.pre),createdAt:Date.now()};
   const oldCost={};(doc.items||[]).forEach(i=>oldCost[i.pid]=i.cost);

@@ -8,7 +8,7 @@ function invData(d){
   const isTx=d.type==='sale'||d.type==='purchase';
   const pcv=d.payCash!==undefined?num(d.payCash):(d.method==='bank'?0:num(d.paid)),pbv=d.payBank!==undefined?num(d.payBank):(d.method==='bank'?num(d.paid):0);
   const dueNow=t.money?docDue(d):0,pd=p?dueOf(p):0;
-  const rows=(d.items||[]).map((i,n)=>{const pr=S.products.get(i.pid);return{n:n+1,name:i.name,qty:r2(i.qty),unit:pr&&pr.unit?pr.unit:'',price:(t.price||d.type==='free')?num(i.price):null,amt:num(i.qty)*num(i.price)}});
+  const rows=(d.items||[]).map((i,n)=>{const pr=S.products.get(i.pid);return{n:n+1,name:i.name,qty:hasSub(pr)?esc(fq(pr,i.qty)):r2(i.qty),unit:hasSub(pr)?'':(pr&&pr.unit?pr.unit:''),price:(t.price||d.type==='free')?num(i.price):null,amt:num(i.qty)*num(i.price)}});
   return{b,p,t,d,isTx,pcv,pbv,dueNow,pd,prev:(p&&isTx)?r2(pd-dueNow):0,laterList:isTx?(X.exl[d.id]||[]):[],rows,free:d.type==='free',fi:(d.freeItems||[]).filter(x=>num(x.qty)>0),logo:b.logo||LOGO_URI,
     title:t.l+(t.order?'':' ইনভয়েস'),partyLabel:p?(p.type==='supplier'?'সাপ্লায়ার':'কাস্টমার'):'',words:d.type==='free'?'':takaWords(d.total)};
 }

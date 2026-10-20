@@ -182,8 +182,8 @@ async function boot(){
     window.__booted=true;
     const so=syncOn()&&navigator.onLine,t0=Date.now();
     const tx=$('#splashtx');if(tx)tx.textContent=so?'ডাটা সিঙ্ক হচ্ছে…':'ডাটা লোড হচ্ছে…';
-    if(so){try{await Promise.race([doSync(),new Promise(r=>setTimeout(r,6000))])}catch(e){}}
-    const wait=900-(Date.now()-t0);if(wait>0)await new Promise(r=>setTimeout(r,wait));
+    if(so){try{await Promise.race([doSync(),new Promise(r=>setTimeout(r,3000))])}catch(e){}}
+    const wait=700-(Date.now()-t0);if(wait>0)await new Promise(r=>setTimeout(r,wait));
   }
   const g0=new URLSearchParams(location.search).get('go');
   const dr=posDraftLoad(),ui=uiLoad();
@@ -205,7 +205,7 @@ async function boot(){
 window.onSynced=()=>{
   ME=S.users.get(ME&&ME.id)||ME;if(ME&&(ME.del||!ME.active)){localStorage.removeItem(UIDK);location.reload();return}
   $('#tbz').textContent=biz().name||'';applyTopName();syncProfName();
-  if(!modalOpen()&&['dash','invoices','parties','products','lowstock','photos','freestock','categories','units','due','expense','cash'].includes(CUR.r))go(CUR.r,CUR.a);
+  if(!modalOpen()&&['dash','invoices','parties','products','lowstock','photos','freestock','damage','categories','units','due','expense','cash'].includes(CUR.r))go(CUR.r,CUR.a);
   toast('নতুন তথ্য সিঙ্ক হয়েছে','k');
 };
 $('#mb').onclick=()=>{$('#drawer').classList.toggle('open');$('#ov').classList.toggle('show')};

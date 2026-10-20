@@ -3,7 +3,7 @@
 const IMG_MAX=320;            // সর্বোচ্চ দৈর্ঘ্য/প্রস্থ (পিক্সেল)
 const IMG_TARGET=30*1024;     // লক্ষ্য সাইজ (বাইট) — এর কাছাকাছি রাখা হয়
 const imgOf=pid=>{const r=S.imgs.get(pid);return r&&!r.del&&r.d?r.d:''};
-const imgTag=(pid,cls)=>{const d=imgOf(pid);return d?`<img class="${cls||'pth'}" src="${d}" alt="" loading="lazy">`:''};
+const imgTag=(pid,cls)=>{const d=imgOf(pid);return d?`<img class="${cls||'pth'}" src="${d}" alt="" loading="lazy" decoding="async">`:''};
 function imgBytes(d){return Math.round((d.length-d.indexOf(',')-1)*3/4)}
 async function loadBitmap(file){
   if(window.createImageBitmap){try{return await createImageBitmap(file,{imageOrientation:'from-image'})}catch(e){}}

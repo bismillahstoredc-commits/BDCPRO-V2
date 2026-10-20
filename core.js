@@ -102,7 +102,21 @@ async function save(store,rec){
 async function saveMany(store,recs){recs.forEach(r=>{r.updatedAt=Date.now();if(ME)r.by=ME.id;S[store].set(r.id,r);DIRTY[shardOf(store,r)]=++dirtyV});
   await IDB.putMany(store,recs);IDB.put('kv',DIRTY,'dirty');IDXC=null;syncSoon()}
 const remove=(store,rec)=>{rec.del=1;return save(store,rec)};
-function nextNo(prefix){DEV.counter++;IDB.put('kv',DEV,'device');const d=new Date();return `${prefix}-${String(d.getFullYear()).slice(2)}${pad(d.getMonth()+1)}${pad(d.getDate())}-${DEV.tag}${DEV.counter}`}
+function nextNo(prefix){
+  if(prefix==='S'||prefix==='P'){ // বিক্রয় S-00001, ক্রয় P-00001 ... ক্রমিক (মুছে ফেলা নম্বর আর ব্যবহার হয় না)
+    let mx=0;const re=new RegExp('^'+prefix+'-(\\d{5,})$');
+    S.docs.forEach(d=>{const m=re.exec(d.no||'');if(m)mx=Math.max(mx,+m[1])});
+    return prefix+'-'+String(mx+1).padStart(5,'0');
+  }
+  DEV.counter++;IDB.put('kv',DEV,'device');const d=new Date();return `${prefix}-${String(d.getFullYear()).slice(2)}${pad(d.getMonth()+1)}${pad(d.getDate())}-${DEV.tag}${DEV.counter}`}
+/* দুই ডিভাইসে অফলাইনে একই নম্বর হয়ে গেলে সিঙ্কের পর পরেরটির নম্বর নতুন করে দেওয়া হয় */
+async function fixDupNos(){
+  const seen=new Set(),dups=[];
+  [...S.docs.values()].filter(d=>!d.del&&/^(S|P)-\d{5,}$/.test(d.no||'')).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)||String(a.id).localeCompare(b.id)).forEach(d=>{if(seen.has(d.no))dups.push(d);else seen.add(d.no)});
+  for(const d of dups){const old=d.no;await save('docs',{...d,no:nextNo(old[0])});}
+  if(dups.length&&typeof toast==='function')toast(dups.length+'টি ইনভয়েসের নম্বর মিলে যাওয়ায় নতুন নম্বর দেওয়া হয়েছে','k');
+  return dups.length;
+}
 
 /* ========== document types & computed index ========== */
 const TYPES={
@@ -134,16 +148,18 @@ function profitAll(){
 }
 function idx(){
   if(IDXC)return IDXC;
-  const stock={},net={},X={stock,net,cash:num(biz().openCash),bank:num(biz().openBank)};
+  const stock={},net={},X={stock,net,dmg:{},cash:num(biz().openCash),bank:num(biz().openBank)};
   S.products.forEach(p=>{if(!p.del)stock[p.id]=num(p.openQty)});
   S.docs.forEach(d=>{if(d.del)return;const t=TYPES[d.type];if(!t)return;
-    if(t.stock)(d.items||[]).forEach(i=>{if(i.pid in stock)stock[i.pid]+=t.stock*num(i.qty)});
+    if(d.dmg&&(d.type==='sale_return'||d.type==='purchase_return')){(d.items||[]).forEach(i=>{X.dmg[i.pid]=(X.dmg[i.pid]||0)+(d.type==='sale_return'?1:-1)*num(i.qty)})}
+    else if(t.stock)(d.items||[]).forEach(i=>{if(i.pid in stock)stock[i.pid]+=t.stock*num(i.qty)});
     const e=cashEffect(0,d);X.cash+=e[0];X.bank+=e[1];
     if(d.partyId&&!t.order){const due=num(d.total)-num(d.paid);
       const k=d.type==='sale'?1:d.type==='sale_return'?-1:d.type==='purchase'?-1:d.type==='purchase_return'?1:0; // net = they owe us
       net[d.partyId]=(net[d.partyId]||0)+k*due}});
   S.money.forEach(m=>{if(m.del)return;const e=cashEffect(0,m);X.cash+=e[0];X.bank+=e[1];
     if(m.partyId){net[m.partyId]=(net[m.partyId]||0)+(m.kind==='payment_in'?-num(m.amount):m.kind==='payment_out'?num(m.amount):0)}});
+  [stock,X.dmg].forEach(o=>{for(const k in o)if(Math.abs(o[k])<1e-9)o[k]=0}); // দশমিক হিসাবের অতি ক্ষুদ্র অবশিষ্ট (যেমন ২.২e-১৬) শূন্য ধরা
   allocPayments(X);
   return IDXC=X;
 }
@@ -219,6 +235,7 @@ async function doSync(manual){
     for(const[shard,sha]of Object.entries(remote)){if(SYNC.sha[shard]!==sha)pulled+=await pullShard(shard,sha)}
     for(const shard of Object.keys(DIRTY))await pushShard(shard,remote);
     SYNC.last=Date.now();lastErr='';saveKV();
+    if(pulled){try{await fixDupNos()}catch(e){}}
     if(pulled&&window.onSynced)window.onSynced(pulled);
     if(manual)toast('সিঙ্ক সম্পন্ন'+(pulled?` (${pulled}টি নতুন তথ্য)`:''),'k');
   }catch(e){lastErr=e.message||String(e);saveKV();if(manual)toast(lastErr,'e')}
