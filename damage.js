@@ -17,16 +17,38 @@ async function dmgMakeDoc(type,partyId,date,items,note,extra){
 }
 function dmgRowHTML(prods,i){
   return `<div class="dr" data-r="${i}" style="border:1px solid var(--b);border-radius:10px;padding:8px;margin-bottom:8px">
-  <div class="row" style="flex-wrap:nowrap"><select class="dp" style="flex:1;min-width:0"><option value="">— পণ্য বাছুন —</option>${prods.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select><button class="btn o s dx" type="button">✕</button></div>
-  <div class="dq" style="margin-top:6px;font-size:13px;color:var(--m)">পণ্য বাছলে পরিমাণ লেখার ঘর আসবে</div></div>`;
+  <div class="row" style="flex-wrap:nowrap;gap:6px"><input type="text" class="dsq" placeholder="🔍 পণ্যের নাম বা বারকোড দিয়ে খুঁজুন" autocomplete="off" style="flex:1;min-width:0"><button class="btn o s dscan" type="button" title="ক্যামেরায় বারকোড স্ক্যান">📷 স্ক্যান</button><button class="btn o s dx" type="button">✕</button></div>
+  <input type="hidden" class="dp" value="">
+  <div class="dlist" style="display:none;margin-top:4px;max-height:210px;overflow:auto;border:1px solid var(--b);border-radius:8px;background:#fff"></div>
+  <div class="dq" style="margin-top:6px;font-size:13px;color:var(--m)">পণ্য খুঁজে বাছলে পরিমাণ লেখার ঘর আসবে</div></div>`;
+}
+/* পণ্য খোঁজার তালিকা: নাম বা বারকোড লিখলে ছেঁকে দেখায়; ক্যামেরা/স্ক্যানার/Enter দিয়েও বাছা যায় */
+function dmgBindPicker(rows,prods){
+  const norm=x=>String(x||'').toLowerCase();
+  const find=q=>{q=norm(q).trim();const bc=q&&prods.find(p=>norm(p.barcode)===q);if(bc)return[bc];
+    return(q?prods.filter(p=>norm(p.name).includes(q)||norm(p.barcode).includes(q)):prods).slice(0,40)};
+  const pick=(r,p)=>{const dp=r.querySelector('.dp'),sq=r.querySelector('.dsq');dp.value=p.id;sq.value=p.name;r.querySelector('.dlist').style.display='none';dp.dispatchEvent(new Event('change',{bubbles:true}))};
+  const show=r=>{const sq=r.querySelector('.dsq'),box=r.querySelector('.dlist'),L=find(sq.value);r._opts=L;r._hi=0;
+    box.innerHTML=L.length?L.map((p,i)=>`<div class="dopt" data-i="${i}" style="padding:9px 10px;border-bottom:1px solid var(--b);cursor:pointer;${i===0?'background:var(--pll)':''}"><b style="font-size:14px">${esc(p.name)}</b><br><small style="color:var(--m)">${p.barcode?'▮ '+esc(p.barcode)+' · ':''}স্টক ${esc(fq(p,stockOf(p.id)))}</small></div>`).join(''):'<div style="padding:10px;color:var(--m)">কোনো পণ্য পাওয়া যায়নি</div>';
+    box.style.display='block'};
+  rows.addEventListener('input',e=>{if(!e.target.classList.contains('dsq'))return;const r=e.target.closest('.dr');r.querySelector('.dp').value='';r.dataset.pid='';show(r)});
+  rows.addEventListener('focusin',e=>{if(e.target.classList.contains('dsq')){const r=e.target.closest('.dr');if(!r.querySelector('.dp').value)show(r);else try{e.target.select()}catch(x){}}});
+  rows.addEventListener('keydown',e=>{if(!e.target.classList.contains('dsq'))return;const r=e.target.closest('.dr'),box=r.querySelector('.dlist');
+    const mark=()=>[...box.querySelectorAll('.dopt')].forEach((o,i)=>o.style.background=i===r._hi?'var(--pll)':'');
+    if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();if(box.style.display==='none')show(r);const n=(r._opts||[]).length;if(n){r._hi=(r._hi+(e.key==='ArrowDown'?1:n-1))%n;mark();const o=box.querySelectorAll('.dopt')[r._hi];if(o)o.scrollIntoView({block:'nearest'})}}
+    else if(e.key==='Enter'){e.preventDefault();e.stopPropagation();const L=r._opts||find(e.target.value);const p=L[r._hi||0]||L[0];if(p)pick(r,p)}
+    else if(e.key==='Escape'&&box.style.display!=='none'){e.stopPropagation();box.style.display='none'}});
+  rows.addEventListener('mousedown',e=>{const o=e.target.closest('.dopt');if(!o)return;e.preventDefault();const r=o.closest('.dr');pick(r,r._opts[+o.dataset.i])});
+  rows.addEventListener('click',e=>{if(!e.target.classList.contains('dscan'))return;const r=e.target.closest('.dr');
+    openScanner(code=>{const p=prods.find(x=>norm(x.barcode)===norm(code));if(!p){toast('এই বারকোডের পণ্য পাওয়া যায়নি: '+code,'e');return}pick(r,p);toast('✓ '+p.name,'k')},false)});
+  rows.addEventListener('focusout',e=>{if(e.target.classList.contains('dsq')){const r=e.target.closest('.dr');setTimeout(()=>{const b=r&&r.querySelector('.dlist');if(b&&!r.contains(document.activeElement))b.style.display='none'},180)}});
 }
 function dmgOutForm(){
   const cus=live('parties').filter(p=>p.type==='customer').sort((a,b)=>a.name.localeCompare(b.name));
   const prods=live('products').sort((a,b)=>a.name.localeCompare(b.name));
-  if(!cus.length)return toast('আগে একজন কাস্টমার (দোকানদার) যোগ করুন','e');
   let n=0;
   modal('🔁 দোকানদারের ড্যামেজ ফেরত ও বদলি',`<div class="grid g2"><div class="f"><label>তারিখ</label><input type="date" id="do_d" value="${today()}"></div>
-  <div class="f"><label>দোকানদার *</label><select id="do_p"><option value="">-- নির্বাচন --</option>${cus.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></div></div>
+  <div class="f"><label>দোকানদার * <small style="color:var(--m)">(তালিকা থেকে বাছুন বা নিজে নাম লিখুন)</small></label><input id="do_pn" list="do_pl" autocomplete="off" placeholder="🔍 দোকানদারের নাম লিখুন বা বাছুন"><datalist id="do_pl">${cus.map(p=>`<option value="${esc(p.name)}">${esc(p.phone||'')}</option>`).join('')}</datalist><small id="do_pnote" style="color:var(--m);display:block;margin-top:3px"></small></div></div>
   <div class="f"><label>কারণ</label><select id="do_r">${DMG_REASONS.map(r=>`<option>${r}</option>`).join('')}</select></div>
   <div id="do_rows">${dmgRowHTML(prods,n++)}</div><button class="btn o s" id="do_add" type="button">+ আরেকটি পণ্য</button>
   <p style="font-size:12px;color:var(--m)">ফেরত নেওয়া ড্যামেজ মাল বিক্রির স্টকে যোগ হবে না, আলাদা ড্যামেজ স্টকে থাকবে। বদলি মাল দোকানদারকে বাকিতে (একই দামে) দেওয়া হবে, তাই বাকির হিসাব আগের মতোই থাকবে।</p>
@@ -40,6 +62,9 @@ function dmgOutForm(){
       <div style="margin-top:4px">দাম প্রতি ${esc(p.unit||'')}: <input type="number" step="any" class="dpr" value="${num(p.sellPrice)}" style="width:96px;padding:6px">${hasSub(p)?` <small>(প্রতি ${esc(p.subUnit)} ৳<span class="dps">${perSub(p,p.sellPrice)}</span>)</small>`:''}</div>`;
     };
     rows.addEventListener('change',e=>{if(e.target.classList.contains('dp'))fill(e.target.closest('.dr'))});
+    dmgBindPicker(rows,prods);
+    const nameHint=()=>{const v=$('#do_pn').value.trim().toLowerCase(),h=$('#do_pnote');if(!v){h.textContent='';return}const hit=cus.find(c=>c.name.trim().toLowerCase()===v);h.style.color=hit?'var(--g)':'var(--o)';h.textContent=hit?'✓ আগের দোকানদার':'➕ নতুন দোকানদার হিসেবে যোগ হবে'};
+    $('#do_pn').addEventListener('input',nameHint);
     rows.addEventListener('input',e=>{
       const r=e.target.closest('.dr');if(!r)return;const p=S.products.get(r.dataset.pid);if(!p)return;
       if(e.target.classList.contains('dpr')){const s=r.querySelector('.dps');if(s)s.textContent=perSub(p,e.target.value)}
@@ -48,12 +73,12 @@ function dmgOutForm(){
       if(e.target.dataset.qk==='rep')r.dataset.touchedRep='1'});
     rows.addEventListener('click',e=>{
       const r=e.target.closest('.dr');if(!r)return;
-      if(e.target.classList.contains('dx')){if(rows.children.length>1)r.remove();else{r.dataset.pid='';r.querySelector('.dp').value='';fill(r)}}
+      if(e.target.classList.contains('dx')){if(rows.children.length>1)r.remove();else{r.dataset.pid='';r.querySelector('.dp').value='';{const q=r.querySelector('.dsq');if(q)q.value=''}fill(r)}}
       if(e.target.dataset.same){const p=S.products.get(r.dataset.pid);if(!p)return;const v=qtyRead(r,'ret',p),sp=splitQty(p,v);r.querySelectorAll('[data-qk="rep"]').forEach(x=>{x.value=x.dataset.part==='s'?(v?sp.s:''):(v?(hasSub(p)?sp.c:r2(v)):'')});delete r.dataset.touchedRep}});
     $('#do_add').onclick=()=>{rows.insertAdjacentHTML('beforeend',dmgRowHTML(prods,n++))};
     $('#do_c').onclick=()=>closeModal();
     $('#do_s').onclick=async()=>{
-      const pid=$('#do_p').value;if(!pid)return toast('দোকানদার নির্বাচন করুন','e');
+      const typed=$('#do_pn').value.trim();if(!typed)return toast('দোকানদারের নাম লিখুন বা বাছুন','e');
       const ret=[],rep=[];
       for(const r of rows.querySelectorAll('.dr')){
         const p=S.products.get(r.dataset.pid);if(!p)continue;
@@ -63,6 +88,9 @@ function dmgOutForm(){
       }
       if(!ret.length)return toast('অন্তত একটি পণ্য ও ফেরত পরিমাণ দিন','e');
       for(const it of rep){const s=stockOf(it.pid);if(s-it.qty<0&&!confirm(`${it.name}: স্টক ${fq(S.products.get(it.pid),s)}, বদলি ${fq(S.products.get(it.pid),it.qty)}। তবুও সেভ করবেন?`))return}
+      let party=live('parties').find(c=>c.type==='customer'&&c.name.trim().toLowerCase()===typed.toLowerCase());
+      if(!party){party={id:uid(),createdAt:Date.now(),name:typed,type:'customer',phone:'',address:'',opening:0};await save('parties',party)}
+      const pid=party.id;
       const date=$('#do_d').value||today(),reason=$('#do_r').value,grp=uid();
       const d1=await dmgMakeDoc('sale_return',pid,date,ret,'ড্যামেজ ফেরত ('+reason+')',{dmg:1,reason,grp});
       let d2=null;if(rep.length)d2=await dmgMakeDoc('sale',pid,date,rep,'ড্যামেজ বদল ('+reason+')',{repl:1,reason,grp});
@@ -77,7 +105,8 @@ function dmgInForm(){
   if(!sup.length)return toast('আগে কোম্পানি/সাপ্লায়ার যোগ করুন','e');
   modal('↩ কোম্পানিকে ড্যামেজ ফেরত ও নতুন মাল',`<div class="grid g2"><div class="f"><label>তারিখ</label><input type="date" id="di_d" value="${today()}"></div>
   <div class="f"><label>কোম্পানি / সাপ্লায়ার *</label><select id="di_p"><option value="">-- নির্বাচন --</option>${sup.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></div></div>
-  <div id="di_rows">${pool.map((a,i)=>`<div class="dr" data-pid="${a.pid}" style="border:1px solid var(--b);border-radius:10px;padding:8px;margin-bottom:8px">
+  <div class="row" style="flex-wrap:nowrap;gap:6px;margin-bottom:8px"><input type="text" id="di_q" placeholder="🔍 পণ্যের নাম বা বারকোড দিয়ে খুঁজুন" autocomplete="off" style="flex:1;min-width:0"><button class="btn o s" id="di_scan" type="button">📷 স্ক্যান</button></div>
+  <div id="di_rows">${pool.map((a,i)=>`<div class="dr" data-pid="${a.pid}" data-sq="${esc((a.p.name+' '+(a.p.barcode||'')).toLowerCase())}" style="border:1px solid var(--b);border-radius:10px;padding:8px;margin-bottom:8px">
     <b>${esc(a.p.name)}</b> <small style="color:var(--m)">ড্যামেজ স্টকে আছে: ${esc(fq(a.p,a.q))}</small>
     <div style="margin-top:6px">ফেরত দিলাম: ${qtyHTML(a.p,a.q,'ret')}</div>
     <div style="margin-top:4px">নতুন মাল পেলাম: ${qtyHTML(a.p,a.q,'rep')}</div>
@@ -88,6 +117,9 @@ function dmgInForm(){
     rows.addEventListener('input',e=>{const r=e.target.closest('.dr');if(!r||e.target.dataset.qk!=='ret'||r.dataset.touchedRep)return;const p=S.products.get(r.dataset.pid),v=qtyRead(r,'ret',p),sp=splitQty(p,v);
       r.querySelectorAll('[data-qk="rep"]').forEach(x=>{x.value=x.dataset.part==='s'?(v?sp.s:''):(v?(hasSub(p)?sp.c:r2(v)):'')})});
     rows.addEventListener('input',e=>{if(e.target.dataset.qk==='rep')e.target.closest('.dr').dataset.touchedRep='1'});
+    const flt=()=>{const q=$('#di_q').value.trim().toLowerCase();let n=0;rows.querySelectorAll('.dr').forEach(r=>{const ok=!q||r.dataset.sq.includes(q);r.style.display=ok?'':'none';if(ok)n++});let m=$('#di_none');if(!m){m=document.createElement('div');m.id='di_none';m.style.cssText='padding:10px;color:var(--m)';m.textContent='কোনো ড্যামেজ পণ্য পাওয়া যায়নি';rows.after(m)}m.style.display=n?'none':'block'};
+    $('#di_q').addEventListener('input',flt);$('#di_q').onkeydown=e=>{if(e.key==='Enter')e.preventDefault()};
+    $('#di_scan').onclick=()=>openScanner(code=>{const hit=[...rows.querySelectorAll('.dr')].find(r=>{const p=S.products.get(r.dataset.pid);return p&&String(p.barcode||'').toLowerCase()===String(code).toLowerCase()});if(!hit){toast('এই বারকোডের পণ্য ড্যামেজ স্টকে নেই: '+code,'e');return}$('#di_q').value=code;flt();toast('✓ পাওয়া গেছে','k')},false);
     $('#di_c').onclick=()=>closeModal();
     $('#di_s').onclick=async()=>{
       const pid=$('#di_p').value;if(!pid)return toast('কোম্পানি নির্বাচন করুন','e');
