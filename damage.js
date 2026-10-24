@@ -80,6 +80,26 @@ async function dmgCloseReplacement(side,partyId,pid){
     if((d.items||[]).some(i=>i.pid===pid&&!i.rc))list.push(d)});
   for(const d of list){const nd={...d,items:d.items.map(i=>i.pid===pid?{...i,rc:1}:i)};await save('docs',nd)}
 }
+/* "বদলি লাগবে না" করা লাইনের তালিকা ও ফিরিয়ে আনা */
+function dmgClosedList(side){
+  const g={};
+  live('docs').forEach(d=>{
+    let k;
+    if(side==='shop'){if(d.type==='sale_return'&&d.dmg)k=1;else if(d.type==='sale'&&d.repl)k=-1}
+    else{if(d.type==='purchase_return'&&d.dmg)k=1;else if(d.type==='purchase'&&d.repl)k=-1}
+    if(!k)return;
+    (d.items||[]).forEach(i=>{if(!i.rc)return;const key=(d.partyId||'')+'|'+i.pid;const o=g[key]=g[key]||{party:d.partyId||'',pid:i.pid,net:0,date:''};
+      o.net+=k*num(i.qty);if(k>0&&(!o.date||(d.date||'')<o.date))o.date=d.date||''})});
+  return Object.values(g).filter(o=>S.products.get(o.pid)&&!S.products.get(o.pid).del);
+}
+async function dmgReopenReplacement(side,partyId,pid){
+  const list=[];
+  live('docs').forEach(d=>{
+    const ok=side==='shop'?((d.type==='sale_return'&&d.dmg)||(d.type==='sale'&&d.repl)):((d.type==='purchase_return'&&d.dmg)||(d.type==='purchase'&&d.repl));
+    if(!ok||(d.partyId||'')!==partyId)return;
+    if((d.items||[]).some(i=>i.pid===pid&&i.rc))list.push(d)});
+  for(const d of list){const nd={...d,items:d.items.map(i=>{if(i.pid!==pid||!i.rc)return i;const n={...i};delete n.rc;return n})};await save('docs',nd)}
+}
 /* পরে বদলি দেওয়া (দোকানদারকে) বা পরে নতুন মাল পাওয়া (কোম্পানি থেকে) */
 function dmgReplForm(side,partyId){
   const P=dmgPending()[side].filter(o=>o.party===partyId).sort((a,b)=>S.products.get(a.pid).name.localeCompare(S.products.get(b.pid).name));
@@ -241,11 +261,14 @@ SCR.damage=()=>{
     const col=n=>n>=30?'var(--r,#c0392b)':n>=7?'var(--o)':'var(--m)';
     body.innerHTML=L.length?`<p style="color:var(--m);font-size:12px;margin:0 0 8px">${shopSide?'দোকানদারের ড্যামেজ নিয়েছেন কিন্তু বদলি মাল এখনো দেননি — পুরনো আগে দেখাচ্ছে।':'কোম্পানিকে ড্যামেজ ফেরত দিয়েছেন কিন্তু নতুন মাল এখনো পাননি — পুরনো আগে দেখাচ্ছে।'}</p>`+tblc([shopSide?'দোকানদার':'কোম্পানি','পণ্য','>বাকি','কতদিন','',''],L.map(o=>{const p=S.products.get(o.pid),n=dmgDays(o.since);
       return [esc(partyName(o.party)),`${imgTag(p.id,'pthm')}${esc(p.name)}`,`<b style="color:var(--o)">${esc(fq(p,o.pend))}</b>`,`<span style="color:${col(n)}">${n} দিন <small>(${esc(o.since||'')})</small></span>`,
-        `<button class="btn s" data-rp="${o.party}">${shopSide?'বদলি দিন':'নতুন মাল পেলাম'}</button>`,`<button class="btn o s" data-rc="${o.party}|${o.pid}" title="বদলি লাগবে না/মিটে গেছে — তালিকা থেকে সরান">✓ মিটেছে</button>`]}),['মোট '+L.length+'টি','','','','','']):`<div class="empty">${shopSide?'দোকানদারকে কোনো বদলি বাকি নেই 🎉':'কোম্পানির কাছে কোনো বদলি পাওনা নেই 🎉'}</div>`;
+        `<button class="btn s" data-rp="${o.party}">${shopSide?'বদলি দিন':'নতুন মাল পেলাম'}</button>`,`<button class="btn o s" data-rc="${o.party}|${o.pid}" title="মাল না দিয়েই লাইনটি তালিকা থেকে সরায় — স্টক কমে না">🚫 বদলি লাগবে না</button>`]}),['মোট '+L.length+'টি','','','','','']):`<div class="empty">${shopSide?'দোকানদারকে কোনো বদলি বাকি নেই 🎉':'কোম্পানির কাছে কোনো বদলি পাওনা নেই 🎉'}</div>`;
     $$('[data-rp]').forEach(b=>b.onclick=()=>dmgReplForm(sd,b.dataset.rp));
     $$('[data-rc]').forEach(b=>b.onclick=async()=>{const[pt,pd]=b.dataset.rc.split('|'),p=S.products.get(pd);
-      if(!confirm((p?p.name:'')+' — '+partyName(pt)+'\nবদলি আর বাকি নেই ধরে তালিকা থেকে সরাবেন? (স্টক ও টাকার হিসাব বদলাবে না)'))return;
-      await dmgCloseReplacement(sd,pt,pd);toast('তালিকা থেকে সরানো হয়েছে','k');SCR.damage()});
+      if(!confirm((p?p.name:'')+' — '+partyName(pt)+'\n⚠ এতে কোনো মাল দেওয়া/পাওয়া হবে না, স্টকও কমবে-বাড়বে না। শুধু তালিকা থেকে সরবে (পরে নিচের "বদলি লাগবে না" তালিকা থেকে ফেরানো যাবে)।\n\nমাল দিতে চাইলে বাতিল করে "'+(shopSide?'বদলি দিন':'নতুন মাল পেলাম')+'" চাপুন। তবুও সরাবেন?'))return;
+      await dmgCloseReplacement(sd,pt,pd);toast('তালিকা থেকে সরানো হয়েছে — স্টক বদলায়নি','k');SCR.damage()});
+    const CL=dmgClosedList(sd);
+    if(CL.length){body.insertAdjacentHTML('beforeend',`<h4 style="margin:16px 0 6px">🚫 "বদলি লাগবে না" করা লাইন</h4><p style="color:var(--m);font-size:12px;margin:0 0 6px">ভুলে করে থাকলে "↩ ফিরিয়ে আনুন" চাপুন, লাইনটি আবার ওপরের তালিকায় যাবে।</p>`+tblc([shopSide?'দোকানদার':'কোম্পানি','পণ্য','>তখন বাকি ছিল',''],CL.map(o=>{const p=S.products.get(o.pid);return [esc(partyName(o.party)),esc(p.name),esc(fq(p,Math.max(0,o.net))),`<button class="btn o s" data-ro="${o.party}|${o.pid}">↩ ফিরিয়ে আনুন</button>`]}),['','','','']));
+      $$('[data-ro]').forEach(b=>b.onclick=async()=>{const[pt,pd]=b.dataset.ro.split('|');await dmgReopenReplacement(sd,pt,pd);toast('ফিরিয়ে আনা হয়েছে','k');SCR.damage()})}
   }else if(DM.tab==='shop'){
     const rows=Object.entries(shop).sort((a,b)=>b[1].v-a[1].v);
     body.innerHTML=rows.length?tblc(['দোকানদার','>মূল্য (বিক্রয়মূল্যে)','কী কী'],rows.map(([k,o])=>[esc(partyName(k)),money(o.v),Object.entries(o.l).map(([pid,q])=>{const p=S.products.get(pid);return esc(p?p.name:'?')+' × '+esc(fq(p,q))}).join(', ')]),['মোট '+rows.length+' জন','','']):'<div class="empty">কোনো ড্যামেজ ফেরত এখনো নেই</div>';
