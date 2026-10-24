@@ -66,7 +66,7 @@ function dmgPending(){
     o.rets.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:a.at-b.at);
     let rem=o.repl,pend=0,since='',price=0;
     for(const r of o.rets){let q=r.q;const use=Math.min(q,rem);rem-=use;q-=use;if(q>1e-9){pend+=q;if(!since)since=r.date;price=r.price}}
-    pend=r2(pend);
+    pend=Math.round(pend*1e6)/1e6; // r2 নয়: ১ পিস = ১/৪৮ কেস (০.০২০৮…) দুই দশমিকে গোল করলে ভুল হয়
     if(pend>0.0001&&S.products.get(o.pid)&&!S.products.get(o.pid).del){o.pend=pend;o.since=since;o.price=price;out[o.side].push(o)}});
   return out;
 }
@@ -121,7 +121,7 @@ function dmgReplForm(side,partyId){
       for(const r of $('#dr_rows').querySelectorAll('.dr')){
         const p=S.products.get(r.dataset.pid),o=P.find(x=>x.pid===p.id),q=qtyRead(r,'rp',p),price=num(r.querySelector('.dpr').value);
         if(q<=0)continue;
-        if(q>o.pend+1e-9)return toast(p.name+': বাকির বেশি ('+fq(p,o.pend)+') লেখা যাবে না','e');
+        if(q>o.pend+1e-4)return toast(p.name+': বাকির বেশি ('+fq(p,o.pend)+') লেখা যাবে না','e');
         items.push({pid:p.id,name:p.name,qty:q,price})}
       if(!items.length)return toast('অন্তত একটি পণ্যের পরিমাণ দিন','e');
       if(shop)for(const it of items){const s=stockOf(it.pid);if(s-it.qty<0&&!confirm(`${it.name}: স্টক ${fq(S.products.get(it.pid),s)}, বদলি ${fq(S.products.get(it.pid),it.qty)}। তবুও সেভ করবেন?`))return}
