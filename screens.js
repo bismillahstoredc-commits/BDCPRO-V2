@@ -167,7 +167,7 @@ function posStart(type,pre){
   POS={type,editId:pre?.id||null,fromOrder:pre?.fromOrder||null,date:pre?.date||today(),partyId:pre?.partyId||'',
    items:pre?.items?pre.items.map(i=>({pid:i.pid,name:i.name,qty:i.qty,price:i.price,cost:i.cost,manual:true})):[],
    dm:pre?.discMode||'amt',dv:pre?(pre.discMode==='pct'?num(pre.discVal):num(pre.disc)):0,
-   pay:'cash',pa:'',pc:0,pb:0,note:pre?.note||'',q:'',free:pre?.freeItems?pre.freeItems.map(x=>({pid:x.pid,name:x.name,qty:x.qty})):[]};
+   pay:'cash',pa:'',pc:0,pb:0,note:pre?.note||'',q:'',free:pre?.freeItems?pre.freeItems.map(x=>({pid:x.pid,name:x.name,unit:x.unit||'',qty:x.qty})):[]};
   if(pre&&pre.id){ // এডিটের সময় আগের পেমেন্ট ফিরিয়ে আনা
     const paid=num(pre.paid),total=num(pre.total),bank=pre.method==='bank';
     const pc=pre.payCash!==undefined?num(pre.payCash):(bank?0:paid),pb=pre.payBank!==undefined?num(pre.payBank):(bank?paid:0);
@@ -185,7 +185,7 @@ function paintPOS(){
   <div class="pos-r card"><h3>${T.l}${POS.editId?' (এডিট)':''}</h3>
    <div class="grid g2"><div class="f"><label>তারিখ</label><input type="date" id="pd" value="${POS.date}"></div>
    <div class="f"><label>${T.party==='supplier'?'সাপ্লায়ার':'কাস্টমার'}${T.need?' *':''}</label><div class="row" style="flex-wrap:nowrap"><select id="pparty"><option value="">${T.need?'-- নির্বাচন --':'ওয়াক-ইন / কেউ না'}</option>${plist.map(p=>`<option value="${p.id}" ${p.id===POS.partyId?'selected':''}>${esc(p.name)}</option>`).join('')}</select><button class="btn o s" id="pnp">+</button></div></div></div>
-   <div id="cart"></div><div class="sm" id="sm"></div>${POS.type==='sale'?'<div id="fsec"></div>':''}
+   <div id="cart"></div><div class="sm" id="sm"></div>${POS.type==='sale'||POS.type==='sale_order'?'<div id="fsec"></div>':''}
    <div class="f"><label>নোট</label><input id="pnote" value="${esc(POS.note)}"></div>
    <div class="row"><button class="btn gr" id="psave" style="flex:1">${POS.editId?'আপডেট করুন':'সেভ করুন'}</button><button class="btn o" id="pprint">সেভ ও প্রিন্ট</button><button class="btn o" id="pclr">রিসেট</button></div></div></div>`);
   paintGrid();paintCart();paintFree();
@@ -345,14 +345,14 @@ async function posSave(print){
   if(T.stock<0&&!(POS.editId&&(S.docs.get(POS.editId)||{}).dmg)){const old=POS.editId?S.docs.get(POS.editId):null;
     for(const it of POS.items){let s=stockOf(it.pid);if(old&&TYPES[old.type].stock<0)s+=(old.items.find(x=>x.pid===it.pid)?.qty||0);
       if(s-num(it.qty)<0&&!confirm(`${it.name}: স্টক ${fq(S.products.get(it.pid),s)}, বিক্রি ${fq(S.products.get(it.pid),it.qty)}। তবুও সেভ করবেন?`))return}}
-  let frList=null;if(POS.type==='sale'){frList=freeCheck();if(frList===null)return}
+  let frList=null;if(POS.type==='sale'||POS.type==='sale_order'){frList=freeCheck();if(frList===null)return}
   const doc=POS.editId?{...S.docs.get(POS.editId)}:{id:uid(),no:nextNo(T.pre),createdAt:Date.now()};
   const oldCost={};(doc.items||[]).forEach(i=>oldCost[i.pid]=i.cost);
   Object.assign(doc,{type:POS.type,date:POS.date||today(),partyId:POS.partyId||'',
     items:POS.items.map(i=>({pid:i.pid,name:i.name,qty:num(i.qty),price:num(i.price),cost:T.price==='buyPrice'?num(i.price):(oldCost[i.pid]??num(S.products.get(i.pid)?.buyPrice??i.cost))})),
     sub:o.sub,disc:o.disc,discMode:POS.dm,discVal:num(POS.dv),total:T.price?o.total:0,paid,
     payCash:T.money?o.pc:0,payBank:T.money?o.pb:0,method:(T.money&&o.pb>0&&o.pc<=0)?'bank':'cash',note:POS.note});
-  if(frList)doc.freeItems=frList;else if(POS.type==='sale')doc.freeItems=[];
+  if(frList)doc.freeItems=frList;else if(POS.type==='sale'||POS.type==='sale_order')doc.freeItems=[];
   if(T.order)doc.status=doc.status||'open';
   await save('docs',doc);
   if(POS.type==='purchase'){const ups=[];POS.items.forEach(i=>{const p=S.products.get(i.pid);if(!p)return;const np={...p};let ch=false;if(num(p.buyPrice)!==num(i.price)){np.buyPrice=num(i.price);repriceAuto(np);ch=true}if(i.exp&&i.exp!==p.expiry){np.expiry=i.exp;ch=true}if(ch)ups.push(np)});if(ups.length)await saveMany('products',ups)}
@@ -371,6 +371,28 @@ SCR.invoices=()=>{
   $('#if').onchange=e=>{INV.from=e.target.value;paintInv()};$('#it').onchange=e=>{INV.to=e.target.value;paintInv()};$('#iq').oninput=e=>{INV.q=e.target.value;paintInv()};
   paintInv();
 };
+/* অর্ডার কমপ্লিট: এক ক্লিকে অর্ডার থেকে সরাসরি বিক্রয় (ক্রয় অর্ডার হলে ক্রয়) তৈরি। পার্টি থাকলে পুরোটা বাকিতে, না থাকলে নগদ ধরা হয়। পরিবর্তন করতে ✏️ এডিট */
+async function orderComplete(d){
+  if(!d||d.status==='done')return;
+  const sale=d.type==='sale_order',ty=sale?'sale':'purchase',T=TYPES[ty],items=d.items||[];
+  if(!items.length)return toast('অর্ডারে কোনো পণ্য নেই','e');
+  const total=num(d.total),paid=d.partyId?0:total;
+  if(!confirm(`${d.no} — ${money(total)}\n${sale?'বিক্রয়':'ক্রয়'} হিসেবে কমপ্লিট করবেন? ${sale?'স্টক কমবে।':'স্টক বাড়বে।'}\n${d.partyId?'পুরো টাকা বাকিতে যাবে (পরে আদায়/পরিশোধ করতে পারবেন)।':'পার্টি নেই, তাই নগদ ধরা হবে।'}`))return;
+  const fl=sale?freeMerge(d.freeItems):[];
+  if(sale){
+    for(const it of items){const s=stockOf(it.pid);if(s-num(it.qty)<0&&!confirm(`${it.name}: স্টক ${fq(S.products.get(it.pid),s)}, বিক্রি ${fq(S.products.get(it.pid),it.qty)}। তবুও কমপ্লিট করবেন?`))return}
+    const st=freeStats();for(const x of fl){const rem=st.get(x.pid)?st.get(x.pid).rem:0;if(x.qty>rem+1e-9)return toast(x.name+': ফ্রি স্টক কম (অবশিষ্ট '+Math.max(0,rem)+') — ✏️ এডিট করে ঠিক করুন','e')}
+  }
+  const doc={id:uid(),no:nextNo(T.pre),createdAt:Date.now(),type:ty,date:today(),partyId:d.partyId||'',
+    items:items.map(i=>({pid:i.pid,name:i.name,qty:num(i.qty),price:num(i.price),cost:sale?num(S.products.get(i.pid)?.buyPrice??i.cost):num(i.price)})),
+    sub:num(d.sub)||r2(items.reduce((a,i)=>a+num(i.qty)*num(i.price),0)),disc:num(d.disc),discMode:d.discMode||'amt',discVal:num(d.discVal),total,paid,payCash:paid,payBank:0,method:'cash',note:d.note||'',fromOrder:d.id};
+  if(sale)doc.freeItems=fl;
+  await save('docs',doc);
+  if(!sale){const ups=[];items.forEach(i=>{const p=S.products.get(i.pid);if(p&&num(p.buyPrice)!==num(i.price)){const np={...p,buyPrice:num(i.price)};repriceAuto(np);ups.push(np)}});if(ups.length)await saveMany('products',ups)}
+  await save('docs',{...d,status:'done',doneNo:doc.no});
+  toast('কমপ্লিট: '+doc.no+(sale?' বিক্রয়':' ক্রয়')+' হিসেবে যোগ হয়েছে','k');
+  if(typeof paintInv==='function'&&$('#il'))paintInv();
+}
 function paintInv(){
   const q=INV.q.toLowerCase();
   const m={sale:['sale'],purchase:['purchase'],free:['free'],order:['sale_order','purchase_order'],return:['sale_return','purchase_return']}[INV.type];
@@ -378,12 +400,12 @@ function paintInv(){
   const sh=rows.slice(0,INV.lim);
   $('#il').innerHTML=tblc(['ইনভয়েস','তারিখ','পার্টি','>মোট','>বকেয়া',''],sh.map(d=>{const t=TYPES[d.type],due=docDue(d),later=docLater(d);
    const adj=d.dmg||d.repl; // ড্যামেজ ফেরত/বদলি: সাধারণ বকেয়া নয়, পরস্পর সমন্বয় হয়
-   const act=t.order?(d.status==='done'?`<div class="row" style="flex-wrap:nowrap"><button class="btn o s" data-oe="${d.id}">✏️ এডিট</button><button class="btn o s" data-oo="${d.id}" title="আবার চলমান করুন">↩ খুলুন</button></div>`:`<div class="row" style="flex-wrap:nowrap"><button class="btn o s" data-oe="${d.id}">✏️ এডিট</button><button class="btn gr s" data-oc="${d.id}">✓ কমপ্লিট</button></div>`):`<button class="btn o s" data-view="${d.id}">দেখুন</button>`;
+   const act=t.order?(d.status==='done'?`<div class="row" style="flex-wrap:nowrap"><button class="btn o s" data-oe="${d.id}">✏️ এডিট</button><button class="btn o s" data-oo="${d.id}" title="আবার চলমান করুন">↩ খুলুন</button></div>`:`<div class="row" style="flex-wrap:nowrap"><button class="btn o s" data-oe="${d.id}">✏️ এডিট</button><button class="btn gr s" data-oc="${d.id}" title="অর্ডারকে বিক্রয়ে রূপান্তর করে কমপ্লিট করুন">✓ কমপ্লিট</button></div>`):`<button class="btn o s" data-view="${d.id}">দেখুন</button>`;
    return [`${esc(d.no)}<br><span class="bd bp">${t.l}</span>${d.status==='done'?' <span class="bd bg">সম্পন্ন</span>':''}${d.dmg?' <span class="bd br">ড্যামেজ</span>':d.repl?' <span class="bd bo">বদলি</span>':''}`,d.date,partyName(d.partyId),money(d.total),t.money?(adj?`<span class="bd bo">ড্যামেজ সমন্বয়</span><br><small style="color:var(--m)">${money(d.total)} — সাধারণ বাকি নয়</small>`:(due>0.001?`<span class="bd br">${money(due)}</span>`:'<span class="bd bg">পরিশোধিত</span>')+(later>0.001?`<br><small style="color:var(--m)">পরে ${money(later)} ${d.type==='purchase'?'দেওয়া':'পেয়েছি'}</small>`:'')):'-',act]}))+
   `<div class="row sp" style="margin-top:8px"><small>${rows.length}টির মধ্যে ${sh.length}টি দেখানো হচ্ছে</small>${rows.length>sh.length?'<button class="btn o s" id="more">আরও দেখুন</button>':''}</div>`;
   if($('#more'))$('#more').onclick=()=>{INV.lim+=200;paintInv()};
   $$('[data-oe]').forEach(b=>b.onclick=()=>{const d=S.docs.get(b.dataset.oe);if(d){POS=null;go('pos',{type:d.type,pre:d})}});
-  $$('[data-oc]').forEach(b=>b.onclick=async()=>{const d=S.docs.get(b.dataset.oc);if(!d)return;await save('docs',{...d,status:'done'});toast('অর্ডার কমপ্লিট হয়েছে','k');paintInv()});
+  $$('[data-oc]').forEach(b=>b.onclick=()=>orderComplete(S.docs.get(b.dataset.oc)));
   $$('[data-oo]').forEach(b=>b.onclick=async()=>{const d=S.docs.get(b.dataset.oo);if(!d)return;const n={...d};delete n.status;await save('docs',n);toast('অর্ডার আবার চলমান','k');paintInv()});
 }
 document.addEventListener('click',e=>{const v=e.target.closest('[data-view]');if(v){e.preventDefault();viewDoc(v.dataset.view)}const g=e.target.closest('[data-go]');if(g)go(g.dataset.go)});

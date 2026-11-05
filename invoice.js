@@ -128,7 +128,7 @@ function viewDoc(id){
     $('#vb').onclick=()=>closeModal();
     $('#ve').onclick=()=>{closeModal();go('pos',{type:d.type,pre:d})};
     if($('#vpay'))$('#vpay').onclick=()=>payForm(p,S.docs.get(id));
-    if($('#vc'))$('#vc').onclick=()=>{closeModal();const ty=d.type==='sale_order'?'sale':'purchase';POS=null;go('pos',{type:ty,pre:{fromOrder:d.id,partyId:d.partyId,items:d.items,note:d.note}})};
+    if($('#vc'))$('#vc').onclick=()=>{closeModal();const ty=d.type==='sale_order'?'sale':'purchase';POS=null;go('pos',{type:ty,pre:{fromOrder:d.id,partyId:d.partyId,items:d.items,note:d.note,discMode:d.discMode,discVal:d.discVal,disc:d.disc,freeItems:d.freeItems}})};
     if($('#vx'))$('#vx').onclick=async()=>{if(!confirm('ইনভয়েসটি ডিলিট করবেন? স্টক ও হিসাব স্বয়ংক্রিয়ভাবে ঠিক হয়ে যাবে।'))return;await remove('docs',d);MDIRTY=true;closeModal();toast('ডিলিট হয়েছে')};
   },true);
 }

@@ -27,7 +27,7 @@ function freeSuggest(st,used){
   return out;
 }
 function paintFree(){
-  const box=$('#fsec');if(!box||!POS||POS.type!=='sale')return;
+  const box=$('#fsec');if(!box||!POS||(POS.type!=='sale'&&POS.type!=='sale_order'))return;
   POS.free=POS.free||[];
   const st=freeStats(POS.editId),used={};POS.free.forEach(x=>{used[x.pid]=(used[x.pid]||0)+num(x.qty)});
   const avail=[...st.entries()].map(([pid,o])=>({p:FP(pid),pid,rem:r2(o.rem-(used[pid]||0))})).filter(a=>a.p&&a.rem>0).sort((a,b)=>a.p.name.localeCompare(b.p.name));
