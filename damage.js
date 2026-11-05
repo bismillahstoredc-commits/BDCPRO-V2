@@ -70,6 +70,12 @@ function dmgPending(){
     if(pend>0.0001&&S.products.get(o.pid)&&!S.products.get(o.pid).del){o.pend=pend;o.since=since;o.price=price;out[o.side].push(o)}});
   return out;
 }
+/* এই পার্টির মোট বকেয়ার যে অংশ ড্যামেজ ফেরত/বদলি লেনদেন থেকে এসেছে (বদলি দিলে +, ড্যামেজ নিলে −)। সম্পূর্ণ মিটে গেলে ০ */
+function dmgAdjOf(p){let a=0;
+  live('docs').forEach(d=>{if(d.partyId!==p.id)return;
+    if(d.dmg&&(d.type==='sale_return'||d.type==='purchase_return'))a-=num(d.total)-num(d.paid);
+    else if(d.repl&&(d.type==='sale'||d.type==='purchase'))a+=num(d.total)-num(d.paid)});
+  return r2(a)}
 const dmgDays=d=>{if(!d)return 0;const t=new Date(d+'T00:00:00').getTime();return Math.max(0,Math.floor((Date.now()-t)/864e5))};
 /* "বদলি বাকি" মিটিয়ে নেওয়া/মাফ: ওই পার্টি+পণ্যের সব ফেরত ও বদলি লাইনে rc চিহ্ন বসে, হিসাব থেকে বাদ যায় (স্টক/টাকার হিসাব বদলায় না) */
 async function dmgCloseReplacement(side,partyId,pid){

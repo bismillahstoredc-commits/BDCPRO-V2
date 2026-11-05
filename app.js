@@ -93,13 +93,12 @@ function posDraftSave(){
   if(!POSDRAFT_READY||!ME)return;
   try{
     if(POS&&Array.isArray(POS.items)&&POS.items.length){
-      const s=JSON.stringify({uid:ME.id,t:Date.now(),pos:POS});
       const k=JSON.stringify(POS);
-      if(k!==POSDRAFT_LAST){POSDRAFT_LAST=k;localStorage.setItem(POSDRAFT_KEY,s)}
+      if(k!==POSDRAFT_LAST){POSDRAFT_LAST=k;localStorage.setItem(POSDRAFT_KEY,JSON.stringify({uid:ME.id,t:Date.now(),pos:POS}))}
     }else{POSDRAFT_LAST='';localStorage.removeItem(POSDRAFT_KEY)}
   }catch(e){}
 }
-setInterval(posDraftSave,500);
+setInterval(()=>{if(!document.hidden)posDraftSave()},1000);
 addEventListener('pagehide',posDraftSave);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')posDraftSave()});
 /* ========== শেষ পেজ ও ফিল্টার মনে রাখা: অ্যাপ কেটে/রিফ্রেশ হলে সরাসরি সেই পেজে ফেরা ========== */
@@ -163,7 +162,7 @@ function uiSave(){
     if(k!==UI_LAST||Math.abs((o.sc||0)-(+JSON.parse(localStorage.getItem(UI_KEY)||'{}').sc||0))>40){UI_LAST=k;localStorage.setItem(UI_KEY,JSON.stringify(o))}
   }catch(e){}
 }
-setInterval(uiSave,700);
+setInterval(()=>{if(!document.hidden)uiSave()},1200);
 addEventListener('pagehide',uiSave);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')uiSave()});
 function hideSplash(){const s=$('#splash');if(!s)return;s.classList.add('out');setTimeout(()=>s.remove(),400)}
@@ -224,7 +223,6 @@ SCR.settings=()=>{
   <div class="grid g2"><div class="f"><label>শুরুর ক্যাশ ব্যালেন্স</label><input id="oc" type="number" value="${num(b.openCash)}"></div><div class="f"><label>শুরুর ব্যাংক ব্যালেন্স</label><input id="ob" type="number" value="${num(b.openBank)}"></div></div>
   <div class="grid g2"><div class="f"><label>ডিফল্ট ইনভয়েস ডিজাইন</label><select id="bd">${DESIGNS.map(([k,l])=>`<option value="${k}">${l}</option>`).join('')}</select></div>
   <div class="f"><label>সেভ করলে অটো প্রিন্ট</label><select id="bap"><option value="">না</option><option value="1">হ্যাঁ</option></select></div></div>
-  ${nfCard()}
   <div class="f"><label>লোগো (ছোট করে সেভ হবে)</label><input type="file" id="bl" accept="image/*"></div>
   <h3 style="margin-top:14px">✍ বিক্রেতার সাইন (ইনভয়েসে)</h3>
   <div class="grid g2"><div class="f"><label>সাইনের লেখা (সিগনেচার ফন্টে)</label><input id="bst" value="${esc(b.sigText||'Bismillah Distribution Center')}"></div><div class="f"><label>ইনভয়েসে সাইন দেখাবে?</label><select id="bso"><option value="">হ্যাঁ</option><option value="1">না</option></select></div></div>
@@ -236,8 +234,8 @@ SCR.settings=()=>{
   <div class="grid g2"><div class="f"><label>GitHub ইউজারনেম</label><input id="go1" value="${esc(SYNC.owner)}"></div><div class="f"><label>Repository (প্রাইভেট)</label><input id="gr" value="${esc(SYNC.repo)}"></div><div class="f"><label>ব্রাঞ্চ</label><input id="gb" value="${esc(SYNC.branch||'main')}"></div><div class="f"><label>অ্যাক্সেস টোকেন</label><input id="gt" type="password" value="${esc(SYNC.token)}"></div></div>
   <div class="row"><button class="btn" id="gsv">সংযোগ পরীক্ষা ও সেভ</button><button class="btn gr" id="gsy">এখনই সিঙ্ক</button><button class="btn o" id="gall">সব ডেটা আপলোড</button></div><p id="gst" style="font-size:13px;color:var(--m)">${SYNC.last?'সর্বশেষ সিঙ্ক: '+new Date(SYNC.last).toLocaleString():''}</p></div>
   <div class="card"><h3>ব্যাকআপ ও স্টোরেজ</h3><div class="row"><button class="btn" id="ex">ব্যাকআপ ডাউনলোড (JSON)</button><label class="btn o" style="margin:0">ব্যাকআপ ফাইল থেকে ফিরিয়ে আনুন<input type="file" id="im" accept=".json" hidden></label></div><p id="stg" style="font-size:13px;color:var(--m)"></p></div>`);
-  $('#bd').value=b.design||'t80';nfBind(b);$('#bso').value=b.sigOff?'1':'';$('#bap').value=b.autoPrint?'1':'';
-  $('#bsv').onclick=async()=>{const rec={...biz(),name:$('#bn').value.trim(),phone:$('#bp').value.trim(),address:$('#ba').value.trim(),footer:$('#bf').value.trim(),openCash:num($('#oc').value),openBank:num($('#ob').value),design:$('#bd').value,autoPrint:$('#bap').value?1:0,...nfRead()};
+  $('#bd').value=b.design||'t80';$('#bso').value=b.sigOff?'1':'';$('#bap').value=b.autoPrint?'1':'';
+  $('#bsv').onclick=async()=>{const rec={...biz(),name:$('#bn').value.trim(),phone:$('#bp').value.trim(),address:$('#ba').value.trim(),footer:$('#bf').value.trim(),openCash:num($('#oc').value),openBank:num($('#ob').value),design:$('#bd').value,autoPrint:$('#bap').value?1:0};
     const f=$('#bl').files[0];if(f)rec.logo=await shrink(f);rec.sigText=$('#bst').value.trim()||'Bismillah Distribution Center';rec.sigOff=$('#bso').value?1:0;const sf=$('#bsi').files[0];if(sf)rec.sigImg=await shrink(sf);else if($('#bsr')&&$('#bsr').checked)delete rec.sigImg;await save('meta',rec);syncProfName();$('#tbz').textContent=rec.name;applyTopName();toast('সেভ হয়েছে','k');SCR.settings()};
   const ul=()=>{$('#ul').innerHTML=tblc(['নাম','ইউজারনেম','ভূমিকা','স্ট্যাটাস',''],live('users').map(u=>[esc(u.name),esc(u.username),u.role==='owner'?'মালিক':'স্টাফ',u.active?'<span class="bd bg">সক্রিয়</span>':'<span class="bd br">বন্ধ</span>',u.role==='owner'&&u.id===ME.id?'':`<div class="row" style="flex-wrap:nowrap"><button class="btn o s" data-tg="${u.id}">${u.active?'বন্ধ করুন':'চালু করুন'}</button><button class="btn o s" data-pw="${u.id}">পাসওয়ার্ড</button></div>`]));
     $$('[data-tg]').forEach(x=>x.onclick=async()=>{const u=S.users.get(x.dataset.tg);await save('users',{...u,active:u.active?0:1});ul()});

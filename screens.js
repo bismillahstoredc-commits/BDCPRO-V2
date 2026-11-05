@@ -8,7 +8,7 @@ const MENU=[
  ['পণ্য'],['products','📦','পণ্যসমূহ'],['lowstock','⚠️','লো-স্টক পণ্য'],['photos','🖼','পণ্যের ছবি ইমপোর্ট'],['categories','🗂️','ক্যাটাগরি'],['units','📏','একক'],['তালিকা'],['parties','👥','পার্টি (কাস্টমার/সাপ্লায়ার)'],
  ['রিপোর্ট'],['reports','📊','রিপোর্ট'],
  ['ইউটিলিটি'],['reset','🔧','অ্যাকাউন্ট রিসেট','owner'],
-['সেটিংস'],['shortcuts','⌨','কিবোর্ড শর্টকাট'],['settings','⚙️','সেটিংস','owner']
+['সেটিংস'],['settings','⚙️','সেটিংস','owner']
 ];
 let CUR={r:'dash',a:null};
 function buildMenu(){
@@ -377,8 +377,13 @@ function paintInv(){
   const rows=live('docs').filter(d=>(!m||m.includes(d.type))&&(!INV.from||d.date>=INV.from)&&(!INV.to||d.date<=INV.to)&&(!q||d.no.toLowerCase().includes(q)||(S.parties.get(d.partyId)?.name||'').toLowerCase().includes(q))).sort(byDateDesc);
   const sh=rows.slice(0,INV.lim);
   $('#il').innerHTML=tblc(['ইনভয়েস','তারিখ','পার্টি','>মোট','>বকেয়া',''],sh.map(d=>{const t=TYPES[d.type],due=docDue(d),later=docLater(d);
-   return [`${esc(d.no)}<br><span class="bd bp">${t.l}</span>${d.status==='done'?' <span class="bd bg">সম্পন্ন</span>':''}`,d.date,partyName(d.partyId),money(d.total),t.money?(due>0.001?`<span class="bd br">${money(due)}</span>`:'<span class="bd bg">পরিশোধিত</span>')+(later>0.001?`<br><small style="color:var(--m)">পরে ${money(later)} ${d.type==='purchase'?'দেওয়া':'পেয়েছি'}</small>`:''):'-',`<button class="btn o s" data-view="${d.id}">দেখুন</button>`]}))+
+   const adj=d.dmg||d.repl; // ড্যামেজ ফেরত/বদলি: সাধারণ বকেয়া নয়, পরস্পর সমন্বয় হয়
+   const act=t.order?(d.status==='done'?`<div class="row" style="flex-wrap:nowrap"><button class="btn o s" data-oe="${d.id}">✏️ এডিট</button><button class="btn o s" data-oo="${d.id}" title="আবার চলমান করুন">↩ খুলুন</button></div>`:`<div class="row" style="flex-wrap:nowrap"><button class="btn o s" data-oe="${d.id}">✏️ এডিট</button><button class="btn gr s" data-oc="${d.id}">✓ কমপ্লিট</button></div>`):`<button class="btn o s" data-view="${d.id}">দেখুন</button>`;
+   return [`${esc(d.no)}<br><span class="bd bp">${t.l}</span>${d.status==='done'?' <span class="bd bg">সম্পন্ন</span>':''}${d.dmg?' <span class="bd br">ড্যামেজ</span>':d.repl?' <span class="bd bo">বদলি</span>':''}`,d.date,partyName(d.partyId),money(d.total),t.money?(adj?`<span class="bd bo">ড্যামেজ সমন্বয়</span><br><small style="color:var(--m)">${money(d.total)} — সাধারণ বাকি নয়</small>`:(due>0.001?`<span class="bd br">${money(due)}</span>`:'<span class="bd bg">পরিশোধিত</span>')+(later>0.001?`<br><small style="color:var(--m)">পরে ${money(later)} ${d.type==='purchase'?'দেওয়া':'পেয়েছি'}</small>`:'')):'-',act]}))+
   `<div class="row sp" style="margin-top:8px"><small>${rows.length}টির মধ্যে ${sh.length}টি দেখানো হচ্ছে</small>${rows.length>sh.length?'<button class="btn o s" id="more">আরও দেখুন</button>':''}</div>`;
   if($('#more'))$('#more').onclick=()=>{INV.lim+=200;paintInv()};
+  $$('[data-oe]').forEach(b=>b.onclick=()=>{const d=S.docs.get(b.dataset.oe);if(d){POS=null;go('pos',{type:d.type,pre:d})}});
+  $$('[data-oc]').forEach(b=>b.onclick=async()=>{const d=S.docs.get(b.dataset.oc);if(!d)return;await save('docs',{...d,status:'done'});toast('অর্ডার কমপ্লিট হয়েছে','k');paintInv()});
+  $$('[data-oo]').forEach(b=>b.onclick=async()=>{const d=S.docs.get(b.dataset.oo);if(!d)return;const n={...d};delete n.status;await save('docs',n);toast('অর্ডার আবার চলমান','k');paintInv()});
 }
 document.addEventListener('click',e=>{const v=e.target.closest('[data-view]');if(v){e.preventDefault();viewDoc(v.dataset.view)}const g=e.target.closest('[data-go]');if(g)go(g.dataset.go)});

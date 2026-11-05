@@ -195,7 +195,10 @@ const isOwner=()=>ME&&ME.role==='owner';
 /* ========== GitHub sync (sharded files: data/docs-YYYY-MM.json ...) ========== */
 let syncing=false,syncTimer=null,lastErr='';
 const syncOn=()=>!!(SYNC.owner&&SYNC.repo&&SYNC.token);
-function gh(path,opt={}){return fetch(`https://api.github.com/repos/${SYNC.owner}/${SYNC.repo}/${path}`,{cache:'no-store',...opt,headers:{Authorization:'token '+SYNC.token,Accept:'application/vnd.github+json',...(opt.headers||{})}})}
+/* ১৫ সেকেন্ডে সাড়া না এলে বাতিল: ওয়াই-ফাই আছে কিন্তু ইন্টারনেট নেই এমন অবস্থায় রিকোয়েস্ট ঝুলে থাকত ও অ্যাপ ধীর লাগত */
+function gh(path,opt={}){const ac=new AbortController(),t=setTimeout(()=>ac.abort(),15000);
+  return fetch(`https://api.github.com/repos/${SYNC.owner}/${SYNC.repo}/${path}`,{cache:'no-store',signal:ac.signal,...opt,headers:{Authorization:'token '+SYNC.token,Accept:'application/vnd.github+json',...(opt.headers||{})}}).finally(()=>clearTimeout(t))}
+let syncFail=0,syncNextOk=0; // ব্যর্থ হলে ৩০সে→১মি→২মি…১০মি পর্যন্ত বিরতি দিয়ে আবার চেষ্টা (হাতে সিঙ্ক চাপলে সাথে সাথে চেষ্টা)
 async function listRemote(){
   const r=await gh(`contents/${ddir()}?ref=${encodeURIComponent(SYNC.branch)}`);
   if(r.status===404)return{};
@@ -229,16 +232,18 @@ async function pushShard(shard,remote){
 async function doSync(manual){
   if(!syncOn()||syncing)return;
   if(!navigator.onLine){setStatus();return}
+  if(!manual&&Date.now()<syncNextOk)return;
   syncing=true;setStatus();let pulled=0;
   try{
     const remote=await listRemote();
     for(const[shard,sha]of Object.entries(remote)){if(SYNC.sha[shard]!==sha)pulled+=await pullShard(shard,sha)}
     for(const shard of Object.keys(DIRTY))await pushShard(shard,remote);
-    SYNC.last=Date.now();lastErr='';saveKV();
+    SYNC.last=Date.now();lastErr='';syncFail=0;syncNextOk=0;saveKV();
     if(pulled){try{await fixDupNos()}catch(e){}}
     if(pulled&&window.onSynced)window.onSynced(pulled);
     if(manual)toast('সিঙ্ক সম্পন্ন'+(pulled?` (${pulled}টি নতুন তথ্য)`:''),'k');
-  }catch(e){lastErr=e.message||String(e);saveKV();if(manual)toast(lastErr,'e')}
+  }catch(e){lastErr=e.name==='AbortError'||/failed to fetch|network|load failed/i.test(e.message||'')?'ইন্টারনেট নেই/দুর্বল — পরে নিজে আবার চেষ্টা করবে':(e.message||String(e));
+    syncFail++;syncNextOk=Date.now()+Math.min(600000,30000*Math.pow(2,syncFail-1));saveKV();if(manual)toast(lastErr,'e')}
   syncing=false;setStatus();
 }
 function syncSoon(){setStatus();if(!syncOn())return;clearTimeout(syncTimer);syncTimer=setTimeout(()=>doSync(),2500)}
@@ -248,5 +253,10 @@ function setStatus(){
   p.title=lastErr||'ট্যাপ করে এখনই সিঙ্ক করুন';
 }
 async function pushAll(){const set={};SYNCED.forEach(s=>S[s].forEach(r=>{DIRTY[shardOf(s,r)]=++dirtyV}));saveKV();await doSync(true)}
-setInterval(()=>{if(syncOn()&&!syncing&&navigator.onLine)doSync()},45000);
-addEventListener('online',()=>{setStatus();doSync()});addEventListener('offline',setStatus);
+setInterval(()=>{if(syncOn()&&!syncing&&navigator.onLine&&!document.hidden)doSync()},45000);
+addEventListener('online',()=>{syncFail=0;syncNextOk=0;setStatus();doSync()});addEventListener('offline',setStatus);
+
+/* দোকানের নাম (সাধারণ লেখা — আলাদা ফন্ট ডিজাইন বাদ দেওয়া হয়েছে) */
+const shopName=b=>esc((b&&b.name)||'');
+const shopNameUI=shopName;
+function applyTopName(){}

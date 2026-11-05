@@ -89,7 +89,7 @@ function payForm(p,doc){
 function ledger(p){
   const ev=[];
   S.docs.forEach(d=>{if(d.del||d.partyId!==p.id||TYPES[d.type].order)return;const k={sale:1,sale_return:-1,purchase:-1,purchase_return:1}[d.type]||0;
-    ev.push({date:d.date,at:num(d.createdAt),txt:`${TYPES[d.type].l} ${d.no} (মোট ${money(d.total)}, পরিশোধ ${money(d.paid)})`,net:k*(num(d.total)-num(d.paid))})});
+    ev.push({date:d.date,at:num(d.createdAt),txt:`${TYPES[d.type].l}${d.dmg?' [ড্যামেজ]':d.repl?' [বদলি]':''} ${d.no} (মোট ${money(d.total)}, পরিশোধ ${money(d.paid)})`,net:k*(num(d.total)-num(d.paid))})});
   S.money.forEach(m=>{if(m.del||m.partyId!==p.id)return;ev.push({date:m.date,at:num(m.createdAt),txt:(m.kind==='payment_in'?'আদায়':'পরিশোধ')+' '+money(m.amount)+(m.docId&&S.docs.get(m.docId)?' ('+esc(S.docs.get(m.docId).no)+' এর বিপরীতে)':'')+(m.note?' — '+esc(m.note):''),net:m.kind==='payment_in'?-num(m.amount):num(m.amount)})});
   ev.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:a.at-b.at);
   let run=num(p.opening);const sup=p.type==='supplier';
@@ -103,9 +103,11 @@ let DT='customer';
 SCR.due=()=>{
   view(`<div class="card"><div class="tabs" style="margin:0"><button class="btn s ${DT==='customer'?'':'o'}" data-t="customer">কাস্টমারের কাছে পাওনা</button><button class="btn s ${DT==='supplier'?'':'o'}" data-t="supplier">সাপ্লায়ারকে দেনা</button></div></div><div class="card" id="dl"></div>`);
   $$('[data-t]').forEach(b=>b.onclick=()=>{DT=b.dataset.t;SCR.due()});
-  let tot=0;const rows=live('parties').filter(p=>p.type===DT).map(p=>({p,d:dueOf(p)})).filter(x=>Math.abs(x.d)>0.001).sort((a,b)=>b.d-a.d);
-  rows.forEach(x=>tot+=x.d);
-  $('#dl').innerHTML=tblc(['নাম','ফোন','>বকেয়া',''],rows.map(x=>[esc(x.p.name),esc(x.p.phone||'-'),`<b>${money(x.d)}</b>`,`<button class="btn gr s" data-pay="${x.p.id}">${DT==='customer'?'আদায়':'পরিশোধ'}</button>`]),['মোট','',money(tot),'']);
+  let tot=0,ta=0;const cu=DT==='customer';
+  const rows=live('parties').filter(p=>p.type===DT).map(p=>({p,d:dueOf(p),a:dmgAdjOf(p)})).filter(x=>Math.abs(x.d)>0.001).sort((a,b)=>b.d-a.d);
+  rows.forEach(x=>{tot+=x.d;ta+=x.a});
+  const adjTxt=a=>Math.abs(a)<0.001?'<span style="color:var(--m)">—</span>':a<0?`<b style="color:var(--g)">− ${money(-a)}</b><br><small style="color:var(--m)">${cu?'ড্যামেজ নিয়েছি, বদলি দেওয়া বাকি':'ড্যামেজ ফেরত দিয়েছি, নতুন মাল পাওয়া বাকি'}</small>`:`<b style="color:var(--o)">+ ${money(a)}</b><br><small style="color:var(--m)">${cu?'বদলি দিয়েছি, ড্যামেজ নেওয়া হয়নি':'নতুন মাল পেয়েছি, ড্যামেজ ফেরত দিইনি'}</small>`;
+  $('#dl').innerHTML=tblc(['নাম','ফোন','>সাধারণ বাকি','>ড্যামেজ/বদলি সমন্বয়','>মোট বকেয়া',''],rows.map(x=>[esc(x.p.name),esc(x.p.phone||'-'),money(r2(x.d-x.a)),adjTxt(x.a),`<b>${money(x.d)}</b>`,`<button class="btn gr s" data-pay="${x.p.id}">${cu?'আদায়':'পরিশোধ'}</button>`]),['মোট','',money(r2(tot-ta)),Math.abs(ta)<0.001?'':money(ta),money(tot),'']);
   $$('[data-pay]').forEach(b=>b.onclick=()=>payForm(S.parties.get(b.dataset.pay)));
 };
 
