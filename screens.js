@@ -371,13 +371,13 @@ SCR.invoices=()=>{
   $('#if').onchange=e=>{INV.from=e.target.value;paintInv()};$('#it').onchange=e=>{INV.to=e.target.value;paintInv()};$('#iq').oninput=e=>{INV.q=e.target.value;paintInv()};
   paintInv();
 };
-/* অর্ডার কমপ্লিট: এক ক্লিকে অর্ডার থেকে সরাসরি বিক্রয় (ক্রয় অর্ডার হলে ক্রয়) তৈরি। পার্টি থাকলে পুরোটা বাকিতে, না থাকলে নগদ ধরা হয়। পরিবর্তন করতে ✏️ এডিট */
+/* অর্ডার কমপ্লিট: এক ক্লিকে অর্ডার থেকে সরাসরি বিক্রয় (ক্রয় অর্ডার হলে ক্রয়) তৈরি। পুরো টাকা নগদ ধরা হয়; বাকি/ব্যাংক/আংশিক হলে ✏️ এডিট */
 async function orderComplete(d){
   if(!d||d.status==='done')return;
   const sale=d.type==='sale_order',ty=sale?'sale':'purchase',T=TYPES[ty],items=d.items||[];
   if(!items.length)return toast('অর্ডারে কোনো পণ্য নেই','e');
-  const total=num(d.total),paid=d.partyId?0:total;
-  if(!confirm(`${d.no} — ${money(total)}\n${sale?'বিক্রয়':'ক্রয়'} হিসেবে কমপ্লিট করবেন? ${sale?'স্টক কমবে।':'স্টক বাড়বে।'}\n${d.partyId?'পুরো টাকা বাকিতে যাবে (পরে আদায়/পরিশোধ করতে পারবেন)।':'পার্টি নেই, তাই নগদ ধরা হবে।'}`))return;
+  const total=num(d.total),paid=total; // ডেলিভারির সময় পুরো টাকা নগদ পাওয়া ধরা হয়; বাকি/ব্যাংক/আংশিক হলে ✏️ এডিট
+  if(!confirm(`${d.no} — ${money(total)}\n${sale?'বিক্রয়':'ক্রয়'} হিসেবে কমপ্লিট করবেন? ${sale?'স্টক কমবে।':'স্টক বাড়বে।'}\n${sale?'পুরো টাকা নগদ পাওয়া ধরা হবে':'পুরো টাকা নগদ দেওয়া ধরা হবে'} (বাকি বা অন্য কিছু হলে বাতিল করে ✏️ এডিট করুন)।`))return;
   const fl=sale?freeMerge(d.freeItems):[];
   if(sale){
     for(const it of items){const s=stockOf(it.pid);if(s-num(it.qty)<0&&!confirm(`${it.name}: স্টক ${fq(S.products.get(it.pid),s)}, বিক্রি ${fq(S.products.get(it.pid),it.qty)}। তবুও কমপ্লিট করবেন?`))return}
